@@ -1,0 +1,25 @@
+========================================
+ CS ARBITRAGE EXTENSION - Info del Proyecto
+========================================
+
+Descripción:
+Extensión para navegador que permite detectar oportunidades
+de arbitraje en skins de Counter-Strike 2 (CS2).
+
+Funcionalidades principales:
+- Escaneo de precios en tiempo real
+- Detección de oportunidades de arbitraje
+- Alertas personalizables
+- Historial de transacciones
+- Estadísticas del mercado
+
+Estado del proyecto:
+- En desarrollo activo
+- Próximas actualizaciones próximamente
+
+Contacto:
+marianojsc21
+
+========================================
+ Creado: Julio 2026
+========================================
