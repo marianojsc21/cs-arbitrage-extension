@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSMuza</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0a1a;
+      --bg-card: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.08);
+      --accent-1: #ff6b35;
+      --accent-2: #d63031;
+      --text-primary: #f0f0f0;
+      --text-secondary: #8888aa;
+      --text-muted: #555577;
+      --profit-green: #00ff88;
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      width: 340px;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      padding: 18px 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.08) 0%, transparent 50%);
+      animation: headerGlow 4s ease-in-out infinite;
+    }
+
+    @keyframes headerGlow {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-10%, 5%); }
+    }
+
+    .header h1 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header p {
+      font-size: 0.7rem;
+      opacity: 0.85;
+      margin-top: 2px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== CONTENT ===== */
+    .content { padding: 16px; }
+
+    /* ===== PIZZA LOADING ===== */
+    .pizza-loading {
+      display: none;
+      text-align: center;
+      padding: 32px 16px;
+    }
+
+    .pizza-loading.show { display: block; animation: fadeIn 0.3s ease-out; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .pizza-spinner {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 12px;
+      font-size: 44px;
+      line-height: 56px;
+      animation: spin 1.2s linear infinite;
+      display: block;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .pizza-loading-text {
+      color: var(--accent-1);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .pizza-loading-sub {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      margin-top: 4px;
+    }
+
+    /* ===== UPDATE BANNER ===== */
+    .update-banner {
+      display: none;
+      background: rgba(255, 107, 53, 0.1);
+      border: 1px solid rgba(255, 107, 53, 0.25);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .update-banner.show { display: block; }
+
+    .update-banner-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .update-banner h3 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--accent-1);
+    }
+
+    .update-banner p {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .btn-update {
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition);
+      letter-spacing: 0.3px;
+    }
+
+    .btn-update:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* ===== MAIN BUTTON ===== */
+    .btn-open {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-open::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      transition: left 0.5s;
+    }
+
+    .btn-open:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 107, 53, 0.35); }
+    .btn-open:hover::before { left: 100%; }
+    .btn-open:active { transform: translateY(0); }
+
+    /* ===== SECTION TITLE ===== */
+    .section-title {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ===== FORM ===== */
+    .form-group { margin-bottom: 12px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 5px;
+    }
+
+    .form-group input[type="number"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-weight: 500;
+      outline: none;
+      transition: all var(--transition);
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent-1);
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+    }
+
+    /* ===== TOGGLE ===== */
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      transition: border-color var(--transition);
+    }
+
+    .toggle-group:hover { border-color: rgba(255,255,255,0.15); }
+
+    .toggle-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toggle-info span:first-child {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .toggle-info span:last-child {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+
+    .toggle {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #333;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #666;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    }
+
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(18px);
+      background: #fff;
+    }
+
+    /* ===== BUTTONS ROW ===== */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-row .btn-save {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition);
+      letter-spacing: 0.3px;
+    }
+
+    .btn-row .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .btn-row .btn-clear {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-row .btn-clear:hover {
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+      background: rgba(214,48,49,0.08);
+    }
+
+    .saved-msg {
+      text-align: center;
+      color: var(--profit-green);
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .saved-msg.show { opacity: 1; }
+
+    /* ===== VERSION INFO ===== */
+    .version-info {
+      text-align: center;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .version-info a {
+      color: var(--accent-1);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+
+    .version-info a:hover { color: #fff; }
+
+    .version-info .ver-num {
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .version-info .check-link {
+      cursor: pointer;
+    }
+
+    .version-info .check-link:hover { color: #fff; }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <h1>🎯 CSMuza</h1>
+    <p>Profit Finder para CS2</p>
+  </div>
+
+  <!-- ===== CONTENT ===== -->
+  <div class="content">
+
+    <!-- Pizza Loading -->
+    <div class="pizza-loading" id="pizzaLoading">
+      <span class="pizza-spinner">🍕</span>
+      <div class="pizza-loading-text">Actualizando...</div>
+      <div class="pizza-loading-sub">Descargando última versión</div>
+    </div>
+
+    <div id="mainContent">
+
+      <!-- Update Banner -->
+      <div class="update-banner" id="updateBanner">
+        <div class="update-banner-header">
+          <span>📢</span>
+          <h3>Nueva versión disponible</h3>
+        </div>
+        <p id="updateText">Hay una actualización disponible</p>
+        <button class="btn-update" id="btnUpdate">Descargar</button>
+      </div>
+
+      <!-- Open App Button -->
+      <button class="btn-open" id="openApp">🚀 Abrir Profit Finder</button>
+
+      <!-- Config -->
+      <div class="section-title">Configuración</div>
+
+      <div class="form-group">
+        <label>Profit Mínimo (%)</label>
+        <input type="number" id="profitMin" value="15" min="1" max="200">
+      </div>
+
+      <div class="form-group">
+        <label>Precio Máximo (USD)</label>
+        <input type="number" id="maxPrice" value="50" min="1" max="5000">
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <span>Auto-escaneo en CSFloat</span>
+          <span>Muestra badges de profit en los listings</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="enabled" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <button class="btn-save" id="saveBtn" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--accent-1),var(--accent-2));color:#fff;font-size:0.8rem;font-weight:700;cursor:pointer;transition:all var(--transition);letter-spacing:0.3px;">💾 Guardar</button>
+      <div class="saved-msg" id="savedMsg">✓ Guardado correctamente</div>
+
+      <div class="version-info">
+        <span class="ver-num" id="currentVersion">1.0.0</span> ·
+        <a href="#" class="check-link" id="checkUpdateBtn">Buscar actualizaciones</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">CSMuza · CS2 Skin Profit Finder</div>
+
+  <script src="js/popup.js"></script>
+</body>
+</html>

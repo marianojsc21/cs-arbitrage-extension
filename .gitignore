@@ -1,0 +1,16 @@
+# Freebuff Desktop workspace data
+.freebuff/
+
+# Build helpers
+generate_icons.html
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
