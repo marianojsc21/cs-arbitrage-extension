@@ -1,24 +1,31 @@
-# 🎯 CSMuza — Profit Finder para CS2
+# 🏛️ SaintProfit — Arbitraje CS2 entre CSFloat y Steam Market
 
-**CSMuza** es una extensión de navegador (Chrome/Brave) que encuentra oportunidades de **arbitraje de precios** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2). Compara precios de skins, cuchillos, guantes, pegatinas, cajas, agentes y más, calculando el profit real descontando la comisión del 15% de Steam.
+**SaintProfit** (v2.3.0) es una extensión de navegador (Brave/Chrome) que encuentra oportunidades de **arbitraje de precios** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+
+Compara precios de **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando la comisión del 15% de Steam.
 
 ---
 
 ## 📋 Tabla de Contenidos
 
 - [Características](#-características)
+- [Capturas](#-capturas)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Instalación](#-instalación)
 - [Uso](#-uso)
+- [Modos](#-modos)
 - [Flujo de Escaneo](#-flujo-de-escaneo)
 - [API y Fuentes de Datos](#-api-y-fuentes-de-datos)
 - [Cálculo de Profit](#-cálculo-de-profit)
 - [Historial de Búsquedas](#-historial-de-búsquedas)
 - [Filtros](#-filtros)
-- [Actualizaciones Automáticas](#-actualizaciones-automáticas)
+- [Ordenamiento](#-ordenamiento)
+- [Contador y Timer en Vivo](#-contador-y-timer-en-vivo)
+- [Actualizaciones](#-actualizaciones)
 - [Content Script (Badges en CSFloat)](#-content-script-badges-en-csfloat)
 - [Solución de Problemas](#-solución-de-problemas)
 - [Versiones](#-versiones)
+- [Diseño](#-diseño)
 - [Licencia](#-licencia)
 
 ---
@@ -30,38 +37,50 @@
 | **Escaneo Inteligente** | Obtiene todos los items de CSFloat y los filtra antes de consultar Steam |
 | **12 Categorías** | Skins, Cuchillos, Guantes, Pegatinas, Cajas, Agentes, Llaveros, Parches, Música, Coleccionables, Graffiti |
 | **Profit Real** | Calcula ganancia descontando el 15% de comisión de Steam |
-| **Filtros en Vivo** | Profit mínimo, rango de precio CSFloat, categoría — sin re-escanear |
+| **Modo Capitallet** | Modo inverso para convertir saldo Steam → Wallet CSFloat |
+| **Filtros en Vivo** | Profit mínimo, rango de precio, categoría, orden — sin re-escanear |
+| **Selector de Orden** | 8 opciones de ordenamiento para SteamFarm |
+| **Contador + Timer** | 🔍 Items escaneados + ⏱️ tiempo transcurrido en tiempo real |
 | **Historial Persistente** | Guarda resultados en localStorage con Top 7 por profit |
-| **Auto-Restauración** | Al recargar la página, se restaura el último escaneo automáticamente |
+| **Top 7 Histórico** | Mejores oportunidades de todos los escaneos, visible en modo inactivo |
+| **Auto-Restauración** | Al recargar la página se restaura el último escaneo automáticamente |
 | **Detener Escaneo** | Botón para detener la búsqueda sin perder resultados parciales |
-| **Ordenamiento** | Clic en cualquier columna de la tabla para ordenar |
-| **Links Directos** | Botones CSF → CSFloat y STM → Steam Market por cada item |
+| **Tabla Ordenable** | Clic en cualquier columna de la tabla para ordenar ascendente/descendente |
+| **Links Directos** | Iconos CSF → CSFloat y Steam → Steam Market por cada item |
 | **Badges en CSFloat** | Content script que muestra badges de profit directamente en csfloat.com |
 | **Auto-Update** | Sistema de actualización automática desde GitHub |
-| **Diseño Gaming** | UI oscura con glassmorphism, animaciones y micro-interacciones |
+| **UI SaintProfit** | Paleta naranja + aqua · Glassmorphism · Animaciones · Diseño responsive |
 
 ---
 
 ## 📁 Estructura del Proyecto
 
 ```
-csmuza/
-├── manifest.json          # Configuración de la extensión (Manifest V3)
-├── app.html               # Página principal del Profit Finder
-├── popup.html             # Popup de la extensión
-├── README.md              # Esta documentación
+saintprofit/
+├── manifest.json           # Configuración de la extensión (Manifest V3)
+├── app.html                # Página principal (SPA con CSS embebido)
+├── popup.html              # Popup minimalista con selector de modos
+├── README.md               # Esta documentación
+├── .gitignore              # Archivos ignorados por git
 ├── icons/
 │   ├── icon16.png
 │   ├── icon48.png
-│   └── icon128.png
+│   ├── icon128.png
+│   ├── icon256.png         # Logo para el header de app.html
+│   ├── brand-header.jpeg   # Lettering SaintProfit
+│   ├── lettering.png       # Lettering grande
+│   ├── lettering-small.png # Lettering para popup
+│   ├── csfloat-link.png    # Icono de link a CSFloat
+│   └── steam-link.webp     # Icono de link a Steam
 ├── css/
-│   └── styles.css         # Estilos para badges en CSFloat
+│   └── styles.css          # Estilos para badges en CSFloat
 └── js/
-    ├── app.js             # Lógica principal del Profit Finder
-    ├── background.js      # Service worker (API Steam, auto-update)
-    ├── content.js         # Content script para badges en CSFloat
-    ├── popup.js           # Lógica del popup
-    └── loader.js          # Cargador de archivos actualizados
+    ├── app.js              # Lógica principal: UI, APIs, historial, renderizado
+    ├── background.js        # Service worker: proxy Steam, auto-update
+    ├── content.js           # Content script para badges en CSFloat
+    ├── init.js              # Mode switching, Top 7 histórico
+    ├── popup.js             # Lógica del popup
+    └── loader.js            # Cargador de archivos actualizados
 ```
 
 ### 📄 Descripción de Archivos
@@ -69,12 +88,13 @@ csmuza/
 | Archivo | Rol |
 |---|---|
 | **manifest.json** | Manifiesto MV3: permisos, host_permissions, CSP, content_scripts |
-| **app.html** | Single-page application con CSS embebido (~700 líneas de estilo) |
-| **popup.html** | Popup de 340px con configuración rápido |
-| **js/app.js** | IIFE auto-ejecutable: UI, CSFloat API, Steam API, historial, renderizado |
+| **app.html** | Single-page application con CSS embebido (~1600 líneas) y diseño grid |
+| **popup.html** | Popup minimalista con selector de modos (SteamFarm / Capitallet) |
+| **js/app.js** | IIFE auto-ejecutable (~900 líneas): UI, CSFloat API, Steam API, historial, render |
+| **js/init.js** | Mode switching (active/inactive), renderizado Top 7 histórico, event delegation |
 | **js/background.js** | Service worker: proxy de Steam, detección de actualizaciones |
 | **js/content.js** | Inyectado en csfloat.com: detecta listings y muestra badges de profit |
-| **js/popup.js** | Guarda configuración, chequea actualizaciones, abre app.html |
+| **js/popup.js** | Abre app.html con el modo seleccionado vía query param |
 | **css/styles.css** | Badges flotantes con animación para CSFloat |
 
 ---
@@ -101,12 +121,8 @@ csmuza/
    - Seleccioná la carpeta del proyecto
 
 3. **Listo** 🎉
-   - Hacé clic en el icono de la extensión
-   - Configurá tu Profit Mínimo y hacé clic en **"Abrir Profit Finder"**
-
-### Instalación desde Chrome Web Store
-
-*(Próximamente)*
+   - Hacé clic en el icono 🏛️ de SaintProfit en la barra
+   - Elegí un modo y comenzá a escanear
 
 ---
 
@@ -114,21 +130,47 @@ csmuza/
 
 ### Popup de la Extensión
 
-1. Hacé clic en el icono 🎯 de CSMuza en la barra de herramientas
-2. Configurá:
-   - **Profit Mínimo (%)**: Porcentaje mínimo de ganancia (default: 15%)
-   - **Precio Máximo (USD)**: Precio máximo en CSFloat (default: $50)
-   - **Auto-escaneo en CSFloat**: Badges de profit en listings
-3. Hacé clic en **"Abrir Profit Finder"** → se abre en una nueva pestaña
+1. Hacé clic en el icono 🏛️ de SaintProfit en la barra de herramientas
+2. Elegí entre **SteamFarm** o **Capitallet**
+3. Se abre la app en una nueva pestaña con el modo seleccionado
 
-### Profit Finder (app.html)
+### SteamFarm (app.html?mode=profit)
 
-1. **Configurá los filtros**: Categoría, Profit Mínimo, Rango CSFloat, Límite
-2. Hacé clic en **"🚀 Escanear"**
-3. Esperá mientras se procesan los items
+1. **Configurá los filtros** en la columna izquierda: Categoría, Profit Mínimo, Rango CSFloat, Límite, Orden
+2. Hacé clic en **"🔍 Escanear"**
+3. Seguí el progreso en vivo: contador de items + timer ⏱️
 4. Revisá los resultados en la tabla, ordená por cualquier columna
-5. Hacé clic en **CSF** para ver en CSFloat o **STM** para ver en Steam
+5. Hacé clic en los iconos **CSF/Steam** para ver en cada plataforma
 6. Usá el **📋 Historial** para recuperar búsquedas anteriores
+
+### Capitallet (app.html?mode=capitallet)
+
+1. **Configurá los filtros**: Categoría, Diferencia Máxima, Rango CSFloat, Límite, Orden
+2. Hacé clic en **"🔍 Escanear"**
+3. Revisá las coincidencias — buscá items con 🟢 ganancia (CSFloat > Steam)
+4. Comprá en Steam, vendé en CSFloat para materializar tu saldo
+
+### Cambio de Modo
+
+Hacé clic en el título del modo ("SteamFarm" o "Capitallet") para intercambiarlos. El modo activo ocupa el espacio principal y el inactivo se reduce a una columna angosta con stats y Top 7 histórico.
+
+---
+
+## 🔄 Modos
+
+### 💵 SteamFarm
+Busca la **máxima diferencia** de precio donde CSFloat es barato y Steam es caro:
+- **Compra en**: CSFloat
+- **Vende en**: Steam (con comisión del 15%)
+- **Resultado**: Profit en Steam Wallet
+- **Score**: `quantity × (1 / min_price)` para priorizar items baratos con stock
+
+### 💰 Capitallet
+Busca la **mínima diferencia** de precio para convertir saldo Steam a CSFloat:
+- **Compra en**: Steam (con saldo acumulado)
+- **Vende en**: CSFloat
+- **Resultado**: Saldo Steam → Wallet CSFloat
+- Indicador visual 🟢 Ganancia / 🔴 Pérdida en cada fila
 
 ---
 
@@ -145,22 +187,26 @@ csmuza/
    ↓
 5. Ordenar por score = quantity × (1 / min_price)
    ↓
-6. Tomar top N (15 / 30 / 50 / 100 / 200)
+6. Tomar top N según límite configurado (15 / 30 / 50 / 100 / 200)
    ↓
 7. Consultar Steam Market en lotes de 10
    ↓
-8. Calcular profit (steam × 0.85 - csfloat)
+8. Calcular profit (steam × 0.85 - csfloat) o diferencia
    ↓
-9. Mostrar resultados ordenados por profit USD
+9. Mostrar resultados en tabla ordenable
 ```
 
 ### Detalles Técnicos
 
-- **CSFloat API**: Endpoint público `/api/v1/listings/price-list` — sin autenticación
-- **Steam API**: `steamcommunity.com/market/priceoverview/` — con headers anti-bloqueo
-- **Rate Limiting**: Lotes de 10 items, 2 segundos entre lotes
-- **Cache**: Steam cache de 30 minutos para evitar consultas duplicadas
-- **Detención**: `scanning = false` interrumpe el loop en el siguiente lote
+| Aspecto | Detalle |
+|---|---|
+| **CSFloat API** | Endpoint público `/api/v1/listings/price-list` — sin autenticación |
+| **Steam API** | `steamcommunity.com/market/priceoverview/` con headers anti-bloqueo |
+| **Rate Limiting** | Lotes de 10 items, 2 segundos entre lotes |
+| **Cache** | Steam cache de 30 minutos para evitar consultas duplicadas |
+| **Timer** | ⏱️ setInterval con formato M:SS, se limpia en todos los exit paths |
+| **Detención** | `scanning = false` interrumpe el loop en el siguiente lote |
+| **Persistencia** | Resultados guardados en localStorage, auto-restauración al recargar |
 
 ---
 
@@ -217,12 +263,10 @@ profit_percent = ((steam_price_real - csfloat_price) / csfloat_price) × 100
 
 ### Categorías Detectadas Automáticamente
 
-La extensión detecta la categoría de cada item por su `market_hash_name`:
-
 | Categoría | Palabras Clave |
 |---|---|
 | 🎯 Skins | (default) |
-| 🔪 Cuchillos | knife, bayonet, karambit, m9, gut, falchion, navaja, stiletto, talon, ★ |
+| 🔪 Cuchillos | knife, bayonet, karambit, m9, gut, falchion, ★ |
 | 🧤 Guantes | gloves, wrap |
 | 🏷️ Pegatinas | sticker |
 | 📦 Cajas | case, capsule, package |
@@ -237,13 +281,19 @@ La extensión detecta la categoría de cada item por su `market_hash_name`:
 
 ## 📋 Historial de Búsquedas
 
-Cada escaneo se guarda automáticamente en **localStorage** con:
+Cada escaneo se guarda automáticamente en **localStorage** con todos los datos necesarios para restauración.
 
-- **Fecha y hora** del escaneo
-- **Filtros usados** (categoría, profit, precio, límite)
-- **Estadísticas**: total items, escaneados, profit promedio, mejor %, profit total
-- **Top 7 items** con mayor profit (inline en la card)
-- **Resultados completos** para restauración
+### Datos Guardados por Entrada
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador único (timestamp + random) |
+| `date` | Timestamp del escaneo |
+| `label` | Fecha formateada local (es-AR) |
+| `filters` | Categoría, Profit, Precios, Límite usados |
+| `stats` | Total items, escaneados, profit promedio, mejor %, profit total |
+| `topResults` | Top 7 items con mayor profit (nombre, precios, %) |
+| `results` | Array completo de resultados para restauración |
 
 ### Funcionalidades
 
@@ -253,44 +303,106 @@ Cada escaneo se guarda automáticamente en **localStorage** con:
 | **Restaurar escaneo** | Clic en cualquier entrada del historial |
 | **Eliminar entrada** | Clic en ✕ en la entrada |
 | **Borrar todo** | Clic en 🗑️ en el header del panel |
-| **Auto-restauración** | Al recargar la página se restaura el último escaneo |
-| **Límite** | Máximo 20 entradas (las más viejas se descartan) |
+| **Auto-restauración** | Al recargar la página se restaura el último escaneo automáticamente |
+| **Top 7 en el historial** | Cada entrada muestra inline sus mejores items |
+| **Límite** | Máximo 20 entradas (las más viejas se descartan automáticamente) |
+
+### Top 7 Histórico Global
+
+En la columna del **modo inactivo** se muestra un **Top 7 global** que agrega los mejores items de TODOS los escaneos históricos (sin duplicados), ordenados por profit. Al hacer clic en un item, abre su página en CSFloat.
+
+### Historial Separado por Modo
+
+| Modo | Storage Key |
+|---|---|
+| SteamFarm | `saintprofit_history` |
+| Capitallet | `saintprofit_cap_history` |
 
 ---
 
 ## 🎛️ Filtros
 
-| Filtro | Tipo | Default | Descripción |
-|---|---|---|---|
-| **Categoría** | Select | Todas | Filtra por tipo de item |
-| **Profit Mínimo** | Número | 10% | % mínimo de ganancia |
-| **Precio Min CSFloat** | Número | $3 | Precio mínimo en CSFloat |
-| **Precio Max CSFloat** | Número | $50 | Precio máximo en CSFloat |
-| **Límite** | Select | 50 | Items a escanear (15/30/50/100/200) |
+Los filtros están organizados en **2 tarjetas separadas** en la columna izquierda, una para cada modo. Funcionan **en vivo** sobre los resultados ya escaneados (sin re-escanear). Se guardan en localStorage entre sesiones.
 
-Los filtros de **Profit**, **Precio** y **Categoría** funcionan **en vivo** sobre los resultados ya escaneados (sin re-escanear). Se guardan en localStorage entre sesiones.
+### SteamFarm
+
+| Filtro | Tipo | Default | Opciones |
+|---|---|---|---|
+| **Categoría** | Select | Todas | Skins, Cuchillos, Guantes, etc. (12 opciones) |
+| **Profit Mínimo** | Número | 10% | 1–999% |
+| **Precio CSFloat** | Número | $3 – $50 | Mín y máx (2 filas) |
+| **Límite** | Select | 50 | 15 / 30 / 50 / 100 / 200 |
+| **Orden** | Select | Profit % ↓ | 8 opciones de ordenamiento |
+
+### Capitallet
+
+| Filtro | Tipo | Default | Opciones |
+|---|---|---|---|
+| **Categoría** | Select | Todas | 12 opciones |
+| **Precio CSFloat** | Número | $3 – $100 | Mín y máx (2 filas) |
+| **Dif. Máx.** | Número | 5% | 0–100% |
+| **Límite** | Select | 50 | 15 / 30 / 50 / 100 / 200 |
+| **Orden** | Select | Menor dif. | 4 opciones de ordenamiento |
 
 ---
 
-## 🔄 Actualizaciones Automáticas
+## 🔄 Ordenamiento
 
-El service worker (`background.js`) verifica actualizaciones cada hora desde:
+### SteamFarm — 8 Opciones de Orden
+
+| Opción | Ordena por |
+|---|---|
+| ⬇ Profit % ↓ | Mayor profit porcentual primero (default) |
+| ⬆ Profit % ↑ | Menor profit porcentual primero |
+| ⬇ Profit $ ↓ | Mayor profit en dólares primero |
+| ⬆ Profit $ ↑ | Menor profit en dólares primero |
+| ⬆ CSFloat ↑ | Precio CSFloat más barato primero |
+| ⬇ CSFloat ↓ | Precio CSFloat más caro primero |
+| ⬇ Stock ↓ | Mayor stock primero |
+| ⬆ Stock ↑ | Menor stock primero |
+
+### Capitallet — 4 Opciones de Orden
+
+| Opción | Ordena por |
+|---|---|
+| ⬆ Menor dif. | Menor diferencia porcentual (default) |
+| ⬇ Mayor dif. | Mayor diferencia porcentual |
+| ⬆ CSFloat ↑ | Precio CSFloat ascendente |
+| ⬇ CSFloat ↓ | Precio CSFloat descendente |
+
+Además, se puede hacer clic en cualquier **header de columna** de la tabla para ordenar ascendente/descendente.
+
+---
+
+## ⏱️ Contador y Timer en Vivo
+
+Durante el escaneo se muestran en tiempo real:
+
 ```
-https://raw.githubusercontent.com/nisutalineage2-tech/csmuza/main/manifest.json
+📊 Lote 3/5 | Verificando 10 items... (5 con profit)
+████████████████░░░░░░░░░░░░░░░░░ 45%
+🔍 Items escaneados: 30 / 50     ⏱️ 1:23
 ```
 
-Si hay una versión más nueva:
-1. Aparece un banner en el popup
-2. Descargá la actualización → se descargan los archivos nuevos
-3. Se almacenan en `chrome.storage.local` para la próxima carga
+- **Contador**: Se actualiza después de cada lote de 10 items
+- **Timer**: Arranca al presionar "Escanear" (incluye el tiempo de obtener la lista de CSFloat)
+- **Formato**: `M:SS` con `setInterval` de 1 segundo
+- **Limpieza**: El timer se detiene al completar, detener manualmente, o si hay error
+- **Independiente**: Cada modo tiene su propio timer y contador
 
-### Archivos que se actualizan:
-- `js/app.js`
-- `js/content.js`
-- `js/popup.js`
-- `css/styles.css`
-- `popup.html`
-- `app.html`
+---
+
+## 🔄 Actualizaciones
+
+El service worker (`js/background.js`) verifica actualizaciones cada hora desde GitHub:
+```
+https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-extension/main/manifest.json
+```
+
+Si hay una versión más nueva, descarga los archivos actualizados y los almacena en `chrome.storage.local`.
+
+### Archivos que se actualizan automáticamente:
+- `js/app.js` · `js/content.js` · `js/popup.js` · `css/styles.css` · `popup.html` · `app.html`
 
 ---
 
@@ -302,26 +414,16 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 2. **Consulta a Steam**: Obtiene precio de Steam vía background.js
 3. **Cálculo de profit**: Misma fórmula (×0.85)
 4. **Badge flotante**: Muestra CSFloat, Steam y Ganancia con color según %
-   - 🟢 Verde ≥30%
+   - 🟢 Aqua ≥30%
    - 🟡 Amarillo ≥20%
    - 🟠 Naranja ≥10%
    - 🔴 Rojo <10%
-5. **Indicador global**: Badge "CSMuza: ON / OFF" con dot animado
-
-### Configuración desde el popup:
-- **Auto-escaneo en CSFloat**: ON/OFF
-- **Profit Mínimo**: Solo muestra badges si supera este %
+5. **Indicador global**: Badge "SaintProfit: ON / OFF" con dot animado
+6. **Batch Processing**: Listings procesados en lotes de 5, con stagger de 300ms y 2.5s entre lotes
 
 ---
 
 ## 🔧 Solución de Problemas
-
-### ❌ Error CSP: "inline event handler violates..."
-**Causa**: Brave/Chrome MV3 bloquea `onclick` inline en HTML.
-
-**Solución**: 
-1. Recargá la extensión en `brave://extensions` (botón 🔄)
-2. Si persiste, abrí desde el popup (no arrastrando el archivo)
 
 ### ❌ "No se encontraron listados en CSFloat"
 **Causa**: CSFloat cambió su API o hay rate limiting.
@@ -338,10 +440,15 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 2. Esperá 1 minuto entre escaneos
 3. La extensión espera 2s entre lotes de 10 items
 
-### ❌ El botón queda rojo después de escanear
-**Causa**: Bug de versión anterior.
+### ❌ "Extension context invalidated"
+**Causa**: El service worker se recargó mientras el content script seguía activo.
 
-**Solución**: Actualizá a v1.7.2 o superior. Recargá la extensión.
+**Solución**: Recargá la página de CSFloat. La extensión ahora maneja este error gracefulmente.
+
+### ❌ Error CSP en consola
+**Causa**: Una extensión de terceros o Brave intenta inyectar un script en la página de SaintProfit.
+
+**Solución**: Es **inofensivo** — la extensión funciona correctamente de todos modos. Ignorar.
 
 ---
 
@@ -349,16 +456,47 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 
 | Versión | Cambios |
 |---|---|
+| **v2.3.0** | ✨ Filtro "Orden" en SteamFarm (8 opciones) · Contador 🔍 y Timer ⏱️ en tiempo real · Timer cleanup en todos los exit paths · Refinamientos de padding y espaciado |
+| **v2.2.0** | ✨ Dos tarjetas de filtros separadas · Híbrido labels/inputs (lado a lado + Precio CSFloat vertical) · Bordes inferiores corregidos · Dashboard padding refinado |
+| **v2.1.0** | ✨ Layout 3-columnas · Modo inactivo se achica · Top 7 histórico global · Diseño responsive · Brand header con lettering |
+| **v2.0.0** | ✨ **Rebrand**: CSMuza → **SaintProfit** · Paleta naranja + aqua · Popup minimalista · README actualizado |
+| **v1.12.0** | Popup simplificado con selector de modos · URL-based tab selection |
+| **v1.11.0** | Batch processing en content.js (5x más rápido) |
+| **v1.10.0** | Indicador visual 🟢/🔴 en Capitallet · Filas coloreadas |
+| **v1.9.0** | Historial de Capitallet con persistencia propia |
+| **v1.8.0** | Modo Capitallet como pestaña separada |
 | **v1.7.2** | Links CSF/STM en tabla · CSP explícito |
-| **v1.7.1** | CSP explícito en manifest.json |
-| **v1.7.0** | Top 7 en historial · Fix CSP inline onclick |
-| **v1.6.0** | Botón Detener · classList.remove scanning |
 | **v1.5.0** | Diseño renovado · Categorías · Historial · Auto-restauración |
-| **v1.4.0** | Modo profit/steam · Filtros mejorados |
-| **v1.3.0** | Historial de búsquedas con persistencia |
-| **v1.2.0** | Filtros por categoría y límite de items |
-| **v1.1.0** | Control de versiones · Logs de debug |
 | **v1.0.0** | Versión inicial |
+
+---
+
+## 🎨 Diseño
+
+### Paleta de Colores
+
+| Color | Hex | Uso |
+|---|---|---|
+| 🟠 **Naranja** | `#ff6b35` | Acento principal, botones, headers (accent-1) |
+| 🟠 **Naranja claro** | `#ff8c42` | Gradientes, timer (accent-2) |
+| 🟢 **Aqua** | `#00d4aa` | Profit, contador, highlights (accent-3) |
+| ⚫ **Negro** | `#0a0a0a` | Fondo principal |
+| ⚪ **Blanco** | `#f0f0f0` | Texto primario |
+| 🔘 **Gris** | `#666–#999` | Textos secundarios, bordes, muted |
+
+### Efectos Visuales
+
+- **Glassmorphism**: `backdrop-filter: blur(8px)` en tarjetas
+- **Gradientes**: Botones con gradiente naranja + glow
+- **Animaciones**: `slideDown`, `fadeIn`, `rowIn`, `shimmer`, `dot-pulse`, `stat-pulse`
+- **Hover states**: Todos los elementos interactivos tienen transiciones suaves
+- **Scrollbar**: Personalizada y sutil (6px, semi-transparente)
+- **Fondo animado**: 3 gradientes radiales en posiciones fijas
+- **Diseño responsive**: 3 breakpoints (full, ≤1100px, ≤700px)
+
+### Fuente
+
+- **Space Grotesk** vía Google Fonts — weights 300–700
 
 ---
 
@@ -369,7 +507,7 @@ Este proyecto es de uso personal y educativo. Los datos de CSFloat y Steam son p
 ---
 
 <div align="center">
-  <p>Hecho con 🎯 para la comunidad CS2</p>
+  <p>🏛️ Hecho con 🧡 para la comunidad CS2</p>
   <p>
     <a href="https://csfloat.com">CSFloat</a> ·
     <a href="https://steamcommunity.com/market">Steam Market</a>

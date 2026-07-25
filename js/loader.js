@@ -20,4 +20,4 @@ async function executeLatestScript(fileName) {
   }
 }
 
-window.CSMuzaLoader = { loadLatestFile, executeLatestScript };
+window.SaintProfitLoader = { loadLatestFile, executeLatestScript };

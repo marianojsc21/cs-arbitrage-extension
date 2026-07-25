@@ -2,7 +2,7 @@ let steamPrices = {};
 let profitMin = 10;
 let enabled = true;
 
-const GITHUB_RAW = 'https://raw.githubusercontent.com/nisutalineage2-tech/csmuza/main';
+const GITHUB_RAW = 'https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-extension/main';
 const GITHUB_MANIFEST = GITHUB_RAW + '/manifest.json';
 const FILES_TO_UPDATE = [
   'js/app.js',

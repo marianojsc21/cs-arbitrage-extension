@@ -4,24 +4,40 @@
   let config = { profitMin: 10, enabled: true };
   let processedListings = new Set();
   let observer = null;
+  let contextValid = true;
 
-  async function loadConfig() {
+  // Wrapper seguro para chrome.runtime.sendMessage que maneja "Extension context invalidated"
+  function safeSendMessage(msg) {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'getConfig' }, (response) => {
-        if (response) {
-          config = response;
-        }
-        resolve();
-      });
+      if (!contextValid) return resolve(null);
+      try {
+        chrome.runtime.sendMessage(msg, (response) => {
+          if (chrome.runtime.lastError) {
+            // Error de conexión — contexto invalidado
+            contextValid = false;
+            resolve(null);
+          } else {
+            resolve(response);
+          }
+        });
+      } catch (e) {
+        // Extension context invalidated u otro error
+        contextValid = false;
+        resolve(null);
+      }
     });
   }
 
+  async function loadConfig() {
+    const response = await safeSendMessage({ action: 'getConfig' });
+    if (response) {
+      config = response;
+    }
+  }
+
   async function getSteamPrice(marketName) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'getSteamPrice', marketName }, (response) => {
-        resolve(response?.price || null);
-      });
-    });
+    const response = await safeSendMessage({ action: 'getSteamPrice', marketName });
+    return response?.price || null;
   }
 
   function createProfitBadge(csfloatPrice, steamPrice) {
@@ -31,9 +47,9 @@
     if (profitPercent < config.profitMin) return null;
 
     const badge = document.createElement('div');
-    badge.className = 'csmuza-profit-badge';
+    badge.className = 'saintprofit-profit-badge';
 
-    const color = profitPercent >= 30 ? '#00ff88' :
+    const color = profitPercent >= 30 ? '#00d4aa' :
                   profitPercent >= 20 ? '#88ff00' :
                   profitPercent >= 10 ? '#ffcc00' : '#ff8800';
 
@@ -121,47 +137,74 @@
   }
 
   async function processListings() {
-    if (!config.enabled) return;
+    if (!config.enabled || !contextValid) return;
+
+    const BATCH_SIZE = 5;
+    const STAGGER_MS = 300;
+    const BATCH_DELAY_MS = 2500;
 
     const listings = findListingElements();
 
-    for (const listing of listings) {
+    // Filtrar solo listings no procesados
+    const unprocessed = listings.filter(listing => {
       const id = listing.dataset?.listingId ||
                  listing.querySelector('a[href*="/listing/"]')?.href ||
                  listing.textContent.substring(0, 50);
+      return !processedListings.has(id);
+    });
 
-      if (processedListings.has(id)) continue;
+    if (unprocessed.length === 0) return;
 
-      const info = extractListingInfo(listing);
-      if (!info.marketName || !info.price || info.price <= 0) continue;
+    // Procesar en lotes
+    for (let i = 0; i < unprocessed.length && contextValid; i += BATCH_SIZE) {
+      const batch = unprocessed.slice(i, i + BATCH_SIZE);
 
-      processedListings.add(id);
+      const promises = batch.map((listing, idx) => (async () => {
+        // Stagger individual requests dentro del lote
+        await new Promise(r => setTimeout(r, idx * STAGGER_MS));
+        if (!contextValid) return;
 
-      const steamPrice = await getSteamPrice(info.marketName);
+        const id = listing.dataset?.listingId ||
+                   listing.querySelector('a[href*="/listing/"]')?.href ||
+                   listing.textContent.substring(0, 50);
+        if (processedListings.has(id)) return;
+        processedListings.add(id);
 
-      if (steamPrice && steamPrice > info.price) {
-        const badge = createProfitBadge(info.price, steamPrice);
-        if (badge) {
-          const container = listing.querySelector('[class*="price"], [class*="info"]') || listing;
-          container.style.position = 'relative';
-          container.appendChild(badge);
+        const info = extractListingInfo(listing);
+        if (!info.marketName || !info.price || info.price <= 0) return;
+
+        const steamPrice = await getSteamPrice(info.marketName);
+        if (!contextValid) return;
+
+        if (steamPrice && steamPrice > info.price) {
+          const badge = createProfitBadge(info.price, steamPrice);
+          if (badge) {
+            const container = listing.querySelector('[class*="price"], [class*="info"]') || listing;
+            container.style.position = 'relative';
+            container.appendChild(badge);
+          }
         }
-      }
+      })());
 
-      await new Promise(r => setTimeout(r, 2000));
+      await Promise.all(promises);
+
+      // Delay entre lotes
+      if (i + BATCH_SIZE < unprocessed.length && contextValid) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+      }
     }
   }
 
   function addGlobalIndicator() {
-    const existing = document.getElementById('csmuza-indicator');
+    const existing = document.getElementById('saintprofit-indicator');
     if (existing) existing.remove();
 
     const indicator = document.createElement('div');
-    indicator.id = 'csmuza-indicator';
+    indicator.id = 'saintprofit-indicator';
     indicator.innerHTML = `
       <div class="indicator-content">
         <span class="indicator-dot ${config.enabled ? 'active' : 'paused'}"></span>
-        <span>CSMuza: ${config.enabled ? 'ON' : 'OFF'}</span>
+        <span>⛪ SaintProfit: ${config.enabled ? 'ON' : 'OFF'}</span>
         <span class="indicator-min">Min: ${config.profitMin}%</span>
       </div>
     `;
@@ -189,7 +232,7 @@
     if (request.action === 'configUpdated') {
       loadConfig().then(() => {
         addGlobalIndicator();
-        document.querySelectorAll('.csmuza-profit-badge').forEach(b => b.remove());
+        document.querySelectorAll('.saintprofit-profit-badge').forEach(b => b.remove());
         processedListings.clear();
         processListings();
       });

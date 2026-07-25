@@ -1,7 +1,7 @@
 (async function() {
   'use strict';
 
-  const STORAGE_KEY = 'csmuza_history';
+  const STORAGE_KEY = 'saintprofit_history';
   const MAX_HISTORY = 20;
 
   let allResults = [];
@@ -17,9 +17,22 @@
   const maxPrice = $('#maxPrice');
   const categoryFilter = $('#categoryFilter');
   const maxItemsFilter = $('#maxItemsFilter');
+  const profitSort = $('#profitSort');
   const progressContainer = $('#progressContainer');
   const statusText = $('#statusText');
   const progressFill = $('#progressFill');
+  const scanCounter = $('#scanCounter');
+  const scanTotal = $('#scanTotal');
+  const scanTimer = $('#scanTimer');
+  let scanTimerInterval = null;
+  let scanStartTime = null;
+
+  function formatTimer(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${sec.toString().padStart(2, '0')}`;
+  }
   const resultsContainer = $('#resultsContainer');
   const historyBtn = $('#historyBtn');
   const historyPanel = $('#historyPanel');
@@ -27,6 +40,18 @@
   const historyBadge = $('#historyBadge');
   const closeHistoryBtn = $('#closeHistoryBtn');
   const clearHistoryBtn = $('#clearHistoryBtn');
+
+  // ===== SORT FUNCTIONS =====
+  const sortFns = {
+    'profit-desc': (a, b) => b.profit_percent - a.profit_percent,
+    'profit-asc': (a, b) => a.profit_percent - b.profit_percent,
+    'profit-usd-desc': (a, b) => b.profit_usd - a.profit_usd,
+    'profit-usd-asc': (a, b) => a.profit_usd - b.profit_usd,
+    'csfloat-asc': (a, b) => a.csfloat_price - b.csfloat_price,
+    'csfloat-desc': (a, b) => b.csfloat_price - a.csfloat_price,
+    'stock-desc': (a, b) => (b.quantity || 0) - (a.quantity || 0),
+    'stock-asc': (a, b) => (a.quantity || 0) - (b.quantity || 0),
+  };
 
   // ===== EVENTOS =====
   scanBtn.addEventListener('click', () => {
@@ -56,7 +81,7 @@
   }
 
   function getCatEmoji(cat) {
-    const map = { skins:'🎯', knives:'🔪', gloves:'🧤', stickers:'🏷️', containers:'📦', agents:'👤', keychains:'🔑', patches:'🪡', 'music-kits':'🎵', collectibles:'🎖️', graffiti:'🎨' };
+    const map = { skins:'🔫', knives:'🔪', gloves:'🧤', stickers:'🏷️', containers:'📦', agents:'👤', keychains:'🔑', patches:'🪡', 'music-kits':'🎵', collectibles:'🎖️', graffiti:'🎨' };
     return map[cat] || '📦';
   }
 
@@ -99,6 +124,24 @@
       return null;
     }
   }
+
+  // ===== MIGRACIÓN DESDE CSMuza (v1.x) =====
+  (function migrateOldStorage() {
+    const oldKey = 'csmuza_history';
+    const oldCapKey = 'csmuza_cap_history';
+    const newKey = 'saintprofit_history';
+    const newCapKey = 'saintprofit_cap_history';
+    const oldData = localStorage.getItem(oldKey);
+    if (oldData && !localStorage.getItem(newKey)) {
+      localStorage.setItem(newKey, oldData);
+      localStorage.removeItem(oldKey);
+    }
+    const oldCapData = localStorage.getItem(oldCapKey);
+    if (oldCapData && !localStorage.getItem(newCapKey)) {
+      localStorage.setItem(newCapKey, oldCapData);
+      localStorage.removeItem(oldCapKey);
+    }
+  })();
 
   // ===== HISTORIAL =====
   function loadHistory() {
@@ -318,6 +361,14 @@
     };
 
     try {
+      // Start timer
+      if (scanTimer) scanTimer.textContent = '0:00';
+      if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
+      scanTimerInterval = setInterval(() => {
+        if (scanTimer) scanTimer.textContent = formatTimer(Date.now() - scanStartTime);
+      }, 1000);
+      scanStartTime = Date.now();
+
       statusText.textContent = '📡 Obteniendo lista de precios de CSFloat...';
       progressFill.style.width = '5%';
 
@@ -350,10 +401,11 @@
       progressFill.style.width = '20%';
 
       if (totalCandidates === 0) {
+        if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
         resultsContainer.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">🔍</span><h3>Sin resultados</h3><p>No hay items que cumplan los filtros actuales. Probá con un rango de precio más amplio.</p></div>`;
         showToast('🔍 Sin items con los filtros actuales', 'warning');
         scanBtn.disabled = false;
-        scanBtn.textContent = '🚀 Escanear';
+        scanBtn.textContent = '🔍 Escanear';
         scanning = false;
         return;
       }
@@ -365,6 +417,8 @@
       statusText.textContent = `🔄 Consultando Steam para ${totalToScan} items (lotes de 10)...`;
       progressFill.style.width = '25%';
       allResults = [];
+      if (scanCounter) scanCounter.textContent = '0';
+      if (scanTotal) scanTotal.textContent = totalToScan;
 
       const BATCH_SIZE = 10;
       const STEAM_DELAY = 2000;
@@ -399,6 +453,7 @@
         const batchResults = await Promise.all(promises);
         batchResults.filter(Boolean).forEach(r => allResults.push(r));
         renderResults();
+        if (scanCounter) scanCounter.textContent = Math.min(i + BATCH_SIZE, totalToScan);
 
         if (i + BATCH_SIZE < totalToScan && scanning) {
           await new Promise(r => setTimeout(r, STEAM_DELAY));
@@ -414,6 +469,7 @@
       }
 
       if (wasStopped) {
+        if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
         progressFill.style.width = `${Math.min(100, 25 + (allResults.length / Math.max(totalToScan, 1)) * 70)}%`;
         statusText.textContent = `⏹️ Detenido: ${allResults.length} oportunidades encontradas antes de detener`;
         if (allResults.length > 0) {
@@ -423,7 +479,8 @@
           showToast('⏹️ Escaneo detenido sin resultados', 'warning');
         }
       } else {
-        progressFill.style.width = '100%';
+        if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
+      progressFill.style.width = '100%';
         statusText.textContent = `✅ Completado: ${allResults.length} oportunidades de ${totalToScan} items analizados`;
 
         if (allResults.length === 0) {
@@ -436,13 +493,14 @@
       }
 
     } catch (e) {
+      if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
       resultsContainer.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">❌</span><h3>Error</h3><p>${e.message}</p></div>`;
       statusText.textContent = '❌ Error durante el escaneo';
       showToast(`❌ Error: ${e.message}`, 'error');
     }
 
     scanBtn.disabled = false;
-    scanBtn.textContent = '🚀 Escanear';
+    scanBtn.textContent = '🔍 Escanear';
     scanBtn.classList.remove('scanning');
     scanning = false;
   }
@@ -452,12 +510,17 @@
     const minProfit = parseInt(profitFilter?.value || '0');
     const minPriceVal = parseFloat(minPrice?.value || '0');
     const maxPriceVal = parseFloat(maxPrice?.value || '99999');
+    const sortBy = profitSort?.value || 'profit-desc';
 
-    const filtered = allResults.filter(r =>
+    let filtered = allResults.filter(r =>
       r.profit_percent >= minProfit &&
       r.csfloat_price >= minPriceVal &&
       r.csfloat_price <= maxPriceVal
     );
+
+    // Sort by selected option
+    const fn = sortFns[sortBy] || sortFns['profit-desc'];
+    filtered.sort(fn);
 
     $('#totalCount').textContent = allResults.length;
     $('#profitCount').textContent = filtered.length;
@@ -474,8 +537,8 @@
       } else {
         resultsContainer.innerHTML = `
           <div class="empty-state">
-            <span class="empty-icon" style="font-size:2.5rem">🎯</span>
-            <h3>Preparado para escanear</h3>
+            <span class="empty-icon" style="font-size:2.5rem">⛪</span>
+            <h3>SaintProfit</h3>
             <p>Hacé clic en "Escanear" para buscar oportunidades de profit entre CSFloat y Steam Market.</p>
           </div>
         `;
@@ -521,9 +584,9 @@
           <td class="qty">${r.quantity}</td>
           <td class="cell-actions">
             <a href="https://csfloat.com/search?market_hash_name=${encodeURIComponent(r.market_name)}"
-               target="_blank" class="action-link" title="Ver en CSFloat">CSF</a>
+               target="_blank" class="action-link" title="Ver en CSFloat"><img src="icons/csfloat-link.png" class="action-icon" alt="CSF"></a>
             <a href="https://steamcommunity.com/market/listings/730/${encodeURIComponent(r.market_name)}"
-               target="_blank" class="action-link steam" title="Ver en Steam Market">STM</a>
+               target="_blank" class="action-link steam" title="Ver en Steam Market"><img src="icons/steam-link.webp" class="action-icon" alt="STM"></a>
           </td>
         </tr>
       `;
@@ -565,14 +628,14 @@
   });
 
   // ===== FILTROS EN TIEMPO REAL =====
-  [profitFilter, minPrice, maxPrice, categoryFilter].forEach(el => {
+  [profitFilter, minPrice, maxPrice, categoryFilter, profitSort].forEach(el => {
     if (el) el.addEventListener('change', () => {
       if (allResults.length > 0) renderResults();
     });
   });
 
   // ===== LOCAL STORAGE =====
-  ['profitFilter', 'minPrice', 'maxPrice', 'categoryFilter', 'maxItemsFilter'].forEach(id => {
+  ['profitFilter', 'minPrice', 'maxPrice', 'categoryFilter', 'maxItemsFilter', 'profitSort'].forEach(id => {
     const el = $(id);
     const saved = localStorage.getItem(id);
     if (el && saved) el.value = saved;
@@ -598,4 +661,599 @@
       renderResults();
     }
   }
+
+  // ================================================================
+  // ===== CAPITALLET MODE (COMPLETAMENTE SEPARADO) =====
+  // ================================================================
+
+  let capResults = [];
+  let capScanning = false;
+
+  const capMode = $('#capitalletMode');
+  const capScanBtn = $('#capScanBtn');
+  const capMaxDiff = $('#capMaxDiff');
+  const capMinPrice = $('#capMinPrice');
+  const capMaxPrice = $('#capMaxPrice');
+  const capCategory = $('#capCategory');
+  const capLimit = $('#capLimit');
+  const capSort = $('#capSort');
+  const capProgress = $('#capProgress');
+  const capStatus = $('#capStatus');
+  const capProgressFill = $('#capProgressFill');
+  const capResultsContainer = $('#capResultsContainer');
+  const capScanCounter = $('#capScanCounter');
+  const capScanTotal = $('#capScanTotal');
+  const capScanTimer = $('#capScanTimer');
+  let capTimerInterval = null;
+  let capStartTime = null;
+
+  // ===== TAB SWITCHING =====
+  function switchToTab(mode) {
+    const tab = document.querySelector(`.tab[data-mode="${mode}"]`);
+    if (!tab) return;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('profitMode').style.display = mode === 'profit' ? 'block' : 'none';
+    document.getElementById('capitalletMode').style.display = mode === 'capitallet' ? 'block' : 'none';
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchToTab(tab.dataset.mode);
+    });
+  });
+
+  // Leer ?mode= del URL y seleccionar tab inicial
+  (function initTabFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    if (mode === 'capitallet' || mode === 'profit') {
+      switchToTab(mode);
+    }
+  })();
+
+  // ===== CAPITALLET SCAN =====
+  if (capScanBtn) {
+    capScanBtn.addEventListener('click', () => {
+      if (capScanning) stopCapScan();
+      else startCapScan();
+    });
+  }
+
+  function stopCapScan() {
+    capScanning = false;
+    showToast('⏹️ Deteniendo escaneo Capitallet...', 'warning');
+    capStatus.textContent = '⏹️ Deteniendo... (esperando lote actual)';
+    capScanBtn.disabled = true;
+    capScanBtn.textContent = 'Deteniendo...';
+  }
+
+  function getCapDiffClass(diffPct) {
+    if (diffPct <= 1) return 'match';
+    if (diffPct <= 3) return 'close';
+    return 'far';
+  }
+
+  function renderCapResults() {
+    const maxDiff = parseFloat(capMaxDiff.value || '5');
+    const minPriceVal = parseFloat(capMinPrice.value || '0');
+    const maxPriceVal = parseFloat(capMaxPrice.value || '99999');
+    const sortBy = capSort ? capSort.value : 'diff-asc';
+
+    let filtered = capResults.filter(r =>
+      Math.abs(r.diff_pct) <= maxDiff &&
+      r.csfloat_price >= minPriceVal &&
+      r.csfloat_price <= maxPriceVal
+    );
+
+    // Sort
+    const sortFns = {
+      'diff-asc': (a, b) => Math.abs(a.diff_pct) - Math.abs(b.diff_pct),
+      'diff-desc': (a, b) => Math.abs(b.diff_pct) - Math.abs(a.diff_pct),
+      'csfloat-asc': (a, b) => a.csfloat_price - b.csfloat_price,
+      'csfloat-desc': (a, b) => b.csfloat_price - a.csfloat_price,
+    };
+    filtered.sort(sortFns[sortBy] || sortFns['diff-asc']);
+
+    // Stats
+    document.getElementById('capTotalCount').textContent = capResults.length;
+    document.getElementById('capMatchCount').textContent = filtered.length;
+
+    if (filtered.length === 0) {
+      if (capResults.length > 0) {
+        capResultsContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon" style="font-size:2.5rem">🔍</span>
+            <h3>Sin coincidencias</h3>
+            <p>Ningún item de los ${capResults.length} encontrados cumple con la diferencia máxima del ${maxDiff}%. Probá aumentando el límite.</p>
+          </div>
+        `;
+      } else {
+        capResultsContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon" style="font-size:2.5rem">🔄</span>
+            <h3>Modo Capitallet</h3>
+            <p>Encuentra skins con <strong>precios similares</strong> entre CSFloat y Steam para convertir tu saldo.</p>
+          </div>
+        `;
+      }
+      document.getElementById('capAvgDiff').textContent = '$0';
+      document.getElementById('capBestDiff').textContent = '$0';
+      return;
+    }
+
+    const diffs = filtered.map(r => r.diff_usd);
+    const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+    const minDiff = Math.min(...diffs.map(Math.abs));
+
+    document.getElementById('capAvgDiff').textContent = `$${Math.abs(avg).toFixed(2)}`;
+    document.getElementById('capBestDiff').textContent = `$${minDiff.toFixed(2)}`;
+
+    let html = `
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th data-cap-sort="market_name">Item <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="csfloat_price">CSFloat <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="steam_price">Steam <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="diff_usd">Dif. $ <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="diff_pct">Dif. % <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="quantity">Stock <span class="sort-icon">↕</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    filtered.forEach((r, idx) => {
+      const diffClass = getCapDiffClass(Math.abs(r.diff_pct));
+      const isGain = r.diff_usd >= 0;
+      const diffSign = isGain ? '+' : '';
+      const dirEmoji = isGain ? '🟢' : '🔴';
+      const dirLabel = isGain ? 'GANANCIA' : 'PÉRDIDA';
+      const diffColor = Math.abs(r.diff_pct) <= 1 ? 'cap-positive' : Math.abs(r.diff_pct) <= 3 ? 'cap-neutral' : 'cap-negative';
+      const rowClass = isGain ? 'cap-row-gain' : 'cap-row-loss';
+      html += `
+        <tr class="${rowClass}" style="animation:rowIn 0.3s ease-out ${Math.min(idx * 0.05, 1.5)}s forwards; opacity:0">
+          <td class="skin-name">${r.market_name}</td>
+          <td class="price-csfloat">$${r.csfloat_price.toFixed(2)}</td>
+          <td class="price-steam">$${r.steam_price.toFixed(2)}</td>
+          <td class="${diffColor}">
+            <span class="dir-indicator ${isGain ? 'gain' : 'loss'}" title="${dirLabel}">${dirEmoji}</span>
+            ${diffSign}$${r.diff_usd.toFixed(2)}
+          </td>
+          <td><span class="diff-badge ${diffClass}">${diffSign}${r.diff_pct.toFixed(1)}%</span></td>
+          <td class="qty">${r.quantity}</td>
+          <td class="cell-actions">
+            <a href="https://csfloat.com/search?market_hash_name=${encodeURIComponent(r.market_name)}"
+               target="_blank" class="action-link" title="Ver en CSFloat"><img src="icons/csfloat-link.png" class="action-icon" alt="CSF"></a>
+            <a href="https://steamcommunity.com/market/listings/730/${encodeURIComponent(r.market_name)}"
+               target="_blank" class="action-link steam" title="Ver en Steam Market"><img src="icons/steam-link.webp" class="action-icon" alt="STM"></a>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table></div>';
+    capResultsContainer.innerHTML = html;
+  }
+
+  async function startCapScan() {
+    if (capScanning) return;
+    capScanning = true;
+
+    capScanBtn.disabled = false;
+    capScanBtn.textContent = '⏹ Detener';
+    capScanBtn.classList.add('scanning');
+    capProgress.classList.add('show');
+    capResultsContainer.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">📡</span><h3>Cargando...</h3><p>Obteniendo lista de precios de CSFloat</p></div>';
+
+    const maxDiff = parseFloat(capMaxDiff.value || '5');
+    const minP = parseFloat(capMinPrice.value || '0');
+    const maxP = parseFloat(capMaxPrice.value || '99999');
+    const category = capCategory?.value || 'all';
+    const limit = parseInt(capLimit?.value || '50');
+    const sortBy = capSort?.value || 'diff-asc';
+
+    try {
+      // Start capitallet timer
+      if (capScanTimer) capScanTimer.textContent = '0:00';
+      if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
+      capTimerInterval = setInterval(() => {
+        if (capScanTimer) capScanTimer.textContent = formatTimer(Date.now() - capStartTime);
+      }, 1000);
+      capStartTime = Date.now();
+
+      capStatus.textContent = '📡 Obteniendo lista de precios de CSFloat...';
+      capProgressFill.style.width = '5%';
+
+      const priceList = await fetchCSFloatPriceList();
+      const minPriceCents = minP * 100;
+      const maxPriceCents = maxP * 100;
+
+      capStatus.textContent = `📦 ${priceList.length} items obtenidos. Aplicando filtros...`;
+      capProgressFill.style.width = '15%';
+
+      let candidates = [];
+      for (const item of priceList) {
+        const cat = detectCategory(item.market_hash_name);
+        if (item.min_price < minPriceCents || item.min_price > maxPriceCents) continue;
+        if (!item.quantity || item.quantity < 1) continue;
+        if (category !== 'all' && cat !== category) continue;
+        candidates.push({
+          name: item.market_hash_name,
+          priceCs: item.min_price / 100,
+          quantity: item.quantity,
+          category: cat,
+        });
+      }
+
+      capStatus.textContent = `🔍 ${candidates.length} items pasaron los filtros. Buscando coincidencias...`;
+      capProgressFill.style.width = '20%';
+
+      if (candidates.length === 0) {
+        if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
+        capResultsContainer.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">🔍</span><h3>Sin resultados</h3><p>No hay items que cumplan los filtros actuales.</p></div>`;
+        showToast('🔍 Sin items con los filtros actuales', 'warning');
+        capScanBtn.disabled = false;
+        capScanBtn.textContent = '🔍 Escanear Capitallet';
+        capScanBtn.classList.remove('scanning');
+        capScanning = false;
+        return;
+      }
+
+      // Ordenar por precio ascendente para encontrar mejores coincidencias primero
+      candidates.sort((a, b) => a.priceCs - b.priceCs);
+      const toScan = candidates.slice(0, limit);
+      const totalToScan = toScan.length;
+
+      capStatus.textContent = `🔄 Consultando Steam para ${totalToScan} items...`;
+      capProgressFill.style.width = '25%';
+      capResults = [];
+      if (capScanCounter) capScanCounter.textContent = '0';
+      if (capScanTotal) capScanTotal.textContent = totalToScan;
+
+      const BATCH_SIZE = 10;
+      const STEAM_DELAY = 2000;
+      const totalBatches = Math.ceil(totalToScan / BATCH_SIZE);
+
+      for (let i = 0; i < totalToScan && capScanning; i += BATCH_SIZE) {
+        const batch = toScan.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const progress = 25 + (i / totalToScan) * 70;
+        capProgressFill.style.width = `${progress}%`;
+        capStatus.textContent = `📊 Lote ${batchNum}/${totalBatches} | Verificando ${batch.length} items... (${capResults.length} coincidencias)`;
+
+        const promises = batch.map(async (item) => {
+          const steamPriceRaw = await fetchSteamPrice(item.name);
+          if (steamPriceRaw) {
+            const diff = item.priceCs - steamPriceRaw;
+            const diffPct = ((item.priceCs - steamPriceRaw) / steamPriceRaw) * 100;
+            return {
+              market_name: item.name,
+              csfloat_price: item.priceCs,
+              steam_price: steamPriceRaw,
+              diff_usd: diff,
+              diff_pct: diffPct,
+              quantity: item.quantity,
+              category: item.category,
+            };
+          }
+          return null;
+        });
+
+        const batchResults = await Promise.all(promises);
+        batchResults.filter(Boolean).forEach(r => capResults.push(r));
+        renderCapResults();
+        if (capScanCounter) capScanCounter.textContent = Math.min(i + BATCH_SIZE, totalToScan);
+
+        if (i + BATCH_SIZE < totalToScan && capScanning) {
+          await new Promise(r => setTimeout(r, STEAM_DELAY));
+        }
+      }
+
+      const wasStopped = !capScanning;
+
+      // Guardar en historial Capitallet (siempre, incluso si se detuvo)
+      if (capResults.length > 0 || totalToScan > 0) {
+        addCapHistoryEntry(capResults, {
+          maxDiff: maxDiff,
+          minPrice: minP,
+          maxPrice: maxP,
+          category: category,
+          limit: limit,
+          scanned: wasStopped ? Math.min(totalToScan, capResults.length * 2 + 10) : totalToScan
+        });
+      }
+
+      if (wasStopped) {
+        if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
+        capProgressFill.style.width = `${Math.min(100, 25 + (capResults.length / Math.max(totalToScan, 1)) * 70)}%`;
+        capStatus.textContent = `⏹️ Detenido: ${capResults.length} coincidencias encontradas`;
+        if (capResults.length > 0) {
+          renderCapResults();
+          showToast(`⏹️ ${capResults.length} coincidencias (escaneo detenido)`, 'warning');
+        } else {
+          showToast('⏹️ Escaneo detenido sin resultados', 'warning');
+        }
+      } else {
+        if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
+        capProgressFill.style.width = '100%';
+        capStatus.textContent = `✅ Completado: ${capResults.length} coincidencias de ${totalToScan} items analizados`;
+
+        if (capResults.length === 0) {
+          capResultsContainer.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">😕</span><h3>Sin coincidencias</h3><p>No se encontraron items con precios similares. Probá aumentando la Diferencia Máxima o ampliando el rango de precio.</p></div>`;
+          showToast('😕 Sin coincidencias de precio', 'info');
+        } else {
+          renderCapResults();
+          showToast(`✅ ${capResults.length} coincidencias encontradas`, 'success');
+        }
+      }
+
+    } catch (e) {
+      if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
+      capResultsContainer.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.5rem">❌</span><h3>Error</h3><p>${e.message}</p></div>`;
+      capStatus.textContent = '❌ Error durante el escaneo';
+      showToast(`❌ Error: ${e.message}`, 'error');
+    }
+
+    capScanBtn.disabled = false;
+    capScanBtn.textContent = '🔍 Escanear Capitallet';
+    capScanBtn.classList.remove('scanning');
+    capScanning = false;
+  }
+
+  // ===== CAPITALLET FILTROS EN TIEMPO REAL =====
+  [capMaxDiff, capMinPrice, capMaxPrice, capCategory, capSort].forEach(el => {
+    if (el) el.addEventListener('change', () => {
+      if (capResults.length > 0) renderCapResults();
+    });
+  });
+
+  // ===== CAPITALLET LOCAL STORAGE =====
+  ['capMaxDiff', 'capMinPrice', 'capMaxPrice', 'capCategory', 'capLimit', 'capSort'].forEach(id => {
+    const el = $(id);
+    const saved = localStorage.getItem(id);
+    if (el && saved) el.value = saved;
+    if (el) el.addEventListener('change', () => localStorage.setItem(id, el.value));
+  });
+
+  // ================================================================
+  // ===== CAPITALLET HISTORIAL =====
+  // ================================================================
+
+  const CAP_STORAGE_KEY = 'saintprofit_cap_history';
+  const CAP_MAX_HISTORY = 20;
+
+  let capHistory = [];
+  let capHistoryOpen = false;
+
+  const capHistoryBtn = $('#capHistoryBtn');
+  const capHistoryPanel = $('#capHistoryPanel');
+  const capHistoryList = $('#capHistoryList');
+  const capHistoryBadge = $('#capHistoryBadge');
+  const closeCapHistoryBtn = $('#closeCapHistoryBtn');
+  const clearCapHistoryBtn = $('#clearCapHistoryBtn');
+
+  function loadCapHistory() {
+    try {
+      const raw = localStorage.getItem(CAP_STORAGE_KEY);
+      capHistory = raw ? JSON.parse(raw) : [];
+    } catch(e) { capHistory = []; }
+    renderCapHistory();
+  }
+
+  function saveCapHistory() {
+    try {
+      localStorage.setItem(CAP_STORAGE_KEY, JSON.stringify(capHistory));
+    } catch(e) { /* localStorage lleno */ }
+    renderCapHistory();
+  }
+
+  function addCapHistoryEntry(results, filters) {
+    const totalAbsDiff = results.reduce((s, r) => s + Math.abs(r.diff_usd), 0);
+    const bestDiff = results.length > 0 ? Math.min(...results.map(r => Math.abs(r.diff_pct))) : 0;
+    const entry = {
+      id: 'cap_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      date: Date.now(),
+      label: new Date().toLocaleString('es-AR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }),
+      filters: {
+        maxDiff: filters.maxDiff || 5,
+        minPrice: filters.minPrice || 0,
+        maxPrice: filters.maxPrice || 99999,
+        category: filters.category || 'all',
+        limit: filters.limit || 50,
+      },
+      stats: {
+        total: results.length,
+        scanned: filters.scanned || 0,
+        avgDiff: results.length > 0 ? totalAbsDiff / results.length : 0,
+        bestDiff: bestDiff,
+        categories: [...new Set(results.map(r => r.category).filter(Boolean))],
+      },
+      topResults: results.slice(0, 7).map(r => ({
+        name: r.market_name,
+        cs: r.csfloat_price,
+        st: r.steam_price,
+        diff: r.diff_usd,
+        diffPct: r.diff_pct,
+      })),
+      results: results,
+    };
+
+    capHistory.unshift(entry);
+    if (capHistory.length > CAP_MAX_HISTORY) {
+      capHistory = capHistory.slice(0, CAP_MAX_HISTORY);
+    }
+    saveCapHistory();
+  }
+
+  function deleteCapHistoryEntry(id) {
+    capHistory = capHistory.filter(h => h.id !== id);
+    saveCapHistory();
+    if (capHistory.length === 0) closeCapHistory();
+  }
+
+  function clearAllCapHistory() {
+    if (capHistory.length === 0) return;
+    if (!confirm('¿Borrar todo el historial de Capitallet?')) return;
+    capHistory = [];
+    saveCapHistory();
+    closeCapHistory();
+    showToast('🗑️ Historial Capitallet borrado', 'info');
+  }
+
+  function restoreCapScan(entry) {
+    if (!entry || !entry.results || entry.results.length === 0) return;
+    capResults = entry.results;
+    renderCapResults();
+
+    // Restaurar filtros de la búsqueda original
+    if (entry.filters) {
+      if (capMaxDiff) capMaxDiff.value = entry.filters.maxDiff || 5;
+      if (capMinPrice) capMinPrice.value = entry.filters.minPrice || 0;
+      if (capMaxPrice) capMaxPrice.value = entry.filters.maxPrice || 99999;
+      if (capCategory) capCategory.value = entry.filters.category || 'all';
+      if (capLimit) capLimit.value = entry.filters.limit || 50;
+    }
+
+    // Resetear progreso
+    capProgress.classList.remove('show');
+    capStatus.textContent = '';
+    capProgressFill.style.width = '0%';
+
+    // Marcar como activo en el historial
+    document.querySelectorAll('#capHistoryList .history-item').forEach(el => el.classList.remove('active'));
+    const itemEl = document.querySelector(`#capHistoryList .history-item[data-id="${entry.id}"]`);
+    if (itemEl) itemEl.classList.add('active');
+
+    closeCapHistory();
+    showToast(`🔄 Restaurados ${entry.results.length} resultados Capitallet`, 'success');
+  }
+
+  function renderCapHistory() {
+    if (!capHistoryList) return;
+    const count = capHistory.length;
+
+    if (capHistoryBadge) {
+      capHistoryBadge.style.display = count > 0 ? 'inline' : 'none';
+      capHistoryBadge.textContent = count;
+    }
+
+    if (count === 0) {
+      capHistoryList.innerHTML = '<div class="history-empty">Sin búsquedas guardadas</div>';
+      return;
+    }
+
+    capHistoryList.innerHTML = capHistory.map(h => {
+      const s = h.stats || {};
+      const f = h.filters || {};
+      const catLabel = f.category === 'all' ? 'Todas' : f.category;
+      const top = h.topResults || [];
+      const count = s.total || 0;
+      return `
+        <div class="history-item${capResults === h.results ? ' active' : ''}" data-id="${h.id}">
+          <div class="history-item-main">
+            <div class="history-item-info">
+              <div class="history-item-title">${h.label || 'Sin fecha'} · ${getCatEmoji(f.category)} ${catLabel}</div>
+              <div class="history-item-meta">
+                <span>📊 ${s.scanned || 0} escaneados</span>
+                <span>🎯 ${s.bestDiff ? s.bestDiff.toFixed(1) + '%' : '-'} mejor dif.</span>
+                <span>💵 $${(s.avgDiff || 0).toFixed(2)} dif. prom.</span>
+              </div>
+            </div>
+            <div class="history-item-right">
+              <span class="history-item-count${count === 0 ? ' zero' : ''}">${count}</span>
+              <button class="btn-icon" data-cap-action="delete" data-id="${h.id}" title="Eliminar">✕</button>
+            </div>
+          </div>
+          ${top.length > 0 ? `
+            <div class="history-top">
+              <div class="history-top-header">🏆 Top ${top.length} por menor diferencia</div>
+              ${top.map((t, i) => `
+                <div class="history-top-item">
+                  <span class="ht-rank">#${i + 1}</span>
+                  <span class="ht-name">${t.name}</span>
+                  <span class="ht-pct ${Math.abs(t.diffPct) <= 1 ? 'green' : Math.abs(t.diffPct) <= 3 ? 'yellow' : ''}">${t.diffPct >= 0 ? '+' : ''}${t.diffPct.toFixed(1)}%</span>
+                  <span class="ht-usd">${t.diff >= 0 ? '+' : ''}$${t.diff.toFixed(2)}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ===== CAPITALLET HISTORY EVENTS =====
+  if (capHistoryBtn) {
+    capHistoryBtn.addEventListener('click', () => {
+      if (capHistoryOpen) closeCapHistory();
+      else openCapHistory();
+    });
+  }
+
+  if (closeCapHistoryBtn) {
+    closeCapHistoryBtn.addEventListener('click', closeCapHistory);
+  }
+
+  if (clearCapHistoryBtn) {
+    clearCapHistoryBtn.addEventListener('click', clearAllCapHistory);
+  }
+
+  function openCapHistory() {
+    capHistoryOpen = true;
+    if (capHistoryPanel) capHistoryPanel.classList.add('open');
+    renderCapHistory();
+  }
+
+  function closeCapHistory() {
+    capHistoryOpen = false;
+    if (capHistoryPanel) capHistoryPanel.classList.remove('open');
+  }
+
+  // ===== CAPITALLET HISTORY EVENT DELEGATION =====
+  if (capHistoryList) {
+    capHistoryList.addEventListener('click', (e) => {
+      const item = e.target.closest('.history-item');
+      const del = e.target.closest('[data-cap-action="delete"]');
+      if (del) {
+        e.stopPropagation();
+        const id = del.dataset.id;
+        deleteCapHistoryEntry(id);
+        return;
+      }
+      if (item) {
+        const id = item.dataset.id;
+        const entry = capHistory.find(h => h.id === id);
+        if (entry) restoreCapScan(entry);
+      }
+    });
+  }
+
+  // ===== GUARDAR EN HISTORIAL AL FINALIZAR ESCANEO CAPITALLET =====
+  // Modificar startCapScan para guardar en historial
+  // Reemplazamos las secciones donde se completa el scan en startCapScan
+  // (esto se hace modificando el código arriba - ya lo haremos)
+
+  // ===== INIT CAPITALLET HISTORY =====
+  loadCapHistory();
+
+  // Auto-restaurar último escaneo Capitallet
+  if (capResults.length === 0 && capHistory.length > 0) {
+    const last = capHistory[0];
+    if (last && last.results && last.results.length > 0) {
+      capResults = last.results;
+      if (last.filters) {
+        if (capMaxDiff) capMaxDiff.value = last.filters.maxDiff || 5;
+        if (capMinPrice) capMinPrice.value = last.filters.minPrice || 0;
+        if (capMaxPrice) capMaxPrice.value = last.filters.maxPrice || 99999;
+        if (capCategory) capCategory.value = last.filters.category || 'all';
+        if (capLimit) capLimit.value = last.filters.limit || 50;
+      }
+      renderCapResults();
+    }
+  }
+
 })();

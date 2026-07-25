@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CSMuza",
-  "version": "1.4.0",
-  "description": "Encuentra skins CS2 con profit entre CSFloat y Steam Market",
+  "name": "SaintProfit",
+  "version": "2.0.0",
+  "description": "Encuentra skins CS2 con profit entre CSFloat y Steam Market — SaintProfit",
   "permissions": [
     "storage",
     "activeTab",
