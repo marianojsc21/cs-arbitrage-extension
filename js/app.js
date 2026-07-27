@@ -18,6 +18,7 @@
   const categoryFilter = $('#categoryFilter');
   const maxItemsFilter = $('#maxItemsFilter');
   const profitSort = $('#profitSort');
+  const profitMostSold = $('#profitMostSold');
   const progressContainer = $('#progressContainer');
   const statusText = $('#statusText');
   const progressFill = $('#progressFill');
@@ -26,6 +27,12 @@
   const scanTimer = $('#scanTimer');
   let scanTimerInterval = null;
   let scanStartTime = null;
+
+  // ===== HEADER CLICK SORT STATE =====
+  let sortColumn = null;
+  let sortDirection = 'desc';
+  let capSortColumn = null;
+  let capSortDirection = 'desc';
 
   function formatTimer(ms) {
     const totalSec = Math.floor(ms / 1000);
@@ -51,6 +58,7 @@
     'csfloat-desc': (a, b) => b.csfloat_price - a.csfloat_price,
     'stock-desc': (a, b) => (b.quantity || 0) - (a.quantity || 0),
     'stock-asc': (a, b) => (a.quantity || 0) - (b.quantity || 0),
+    'volume-desc': (a, b) => (b.steam_volume || 0) - (a.steam_volume || 0),
   };
 
   // ===== EVENTOS =====
@@ -93,9 +101,10 @@
   }
 
   // ===== STEAM API =====
+  // Returns { price, volume } or null
   async function fetchSteamPrice(name) {
     if (steamCache[name] && Date.now() - steamCache[name].time < 1800000) {
-      return steamCache[name].price;
+      return steamCache[name];
     }
     try {
       const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=${encodeURIComponent(name)}`;
@@ -112,14 +121,22 @@
         return null;
       }
       const data = await resp.json();
-      let price = null;
-      if (data.lowest_price) {
-        price = parseFloat(data.lowest_price.replace('$', '').replace(',', ''));
-      } else if (data.median_price) {
-        price = parseFloat(data.median_price.replace('$', '').replace(',', ''));
+      if (!data.success) return null;
+      // Solo usamos lowest_price (precio mínimo actual).
+      // NO usamos median_price porque para items de bajo volumen
+      // la mediana histórica puede diferir mucho del precio real.
+      if (!data.lowest_price) return null;
+      let price = parseFloat(data.lowest_price.replace('$', '').replace(',', ''));
+      let volume = 0;
+      if (data.volume) {
+        volume = parseInt(data.volume.replace(/,/g, ''), 10) || 0;
       }
-      if (price) steamCache[name] = { price, time: Date.now() };
-      return price;
+      if (price) {
+        const result = { price, volume, time: Date.now() };
+        steamCache[name] = result;
+        return result;
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -285,8 +302,8 @@
                 <div class="history-top-item">
                   <span class="ht-rank">#${i + 1}</span>
                   <span class="ht-name">${t.name}</span>
-                  <span class="ht-pct ${t.pct >= 50 ? 'green' : t.pct >= 20 ? 'yellow' : ''}">${t.pct.toFixed(0)}%</span>
-                  <span class="ht-usd">+$${t.usd.toFixed(2)}</span>
+                  <span class="ht-pct ${t.pct >= 50 ? 'green' : t.pct >= 20 ? 'yellow' : ''}">${(t.pct || 0).toFixed(0)}%</span>
+                  <span class="ht-usd">+$${(t.usd || 0).toFixed(2)}</span>
                 </div>
               `).join('')}
             </div>
@@ -432,7 +449,9 @@
         statusText.textContent = `📊 Lote ${batchNum}/${totalBatches} | Verificando ${batch.length} items... (${allResults.length} con profit)`;
 
         const promises = batch.map(async (item) => {
-          const steamPriceRaw = await fetchSteamPrice(item.name);
+          const steamResult = await fetchSteamPrice(item.name);
+          const steamPriceRaw = steamResult ? steamResult.price : null;
+          const steamVolume = steamResult ? steamResult.volume : 0;
           if (steamPriceRaw && steamPriceRaw > item.priceCs) {
             const steamAfterFee = steamPriceRaw * 0.85;
             const profit = steamAfterFee - item.priceCs;
@@ -441,6 +460,7 @@
               market_name: item.name,
               csfloat_price: item.priceCs,
               steam_price: steamAfterFee,
+              steam_volume: steamVolume,
               profit_usd: profit,
               profit_percent: profitPercent,
               quantity: item.quantity,
@@ -511,16 +531,30 @@
     const minPriceVal = parseFloat(minPrice?.value || '0');
     const maxPriceVal = parseFloat(maxPrice?.value || '99999');
     const sortBy = profitSort?.value || 'profit-desc';
+    const mostSoldOnly = profitMostSold ? profitMostSold.checked : false;
 
     let filtered = allResults.filter(r =>
       r.profit_percent >= minProfit &&
       r.csfloat_price >= minPriceVal &&
-      r.csfloat_price <= maxPriceVal
+      r.csfloat_price <= maxPriceVal &&
+      (!mostSoldOnly || (r.steam_volume || 0) > 0)
     );
 
     // Sort by selected option
     const fn = sortFns[sortBy] || sortFns['profit-desc'];
     filtered.sort(fn);
+
+    // Override with header click sort if active
+    if (sortColumn) {
+      filtered.sort((a, b) => {
+        const va = a[sortColumn];
+        const vb = b[sortColumn];
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'string') return sortDirection === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb);
+        return sortDirection === 'desc' ? vb - va : va - vb;
+      });
+    }
 
     $('#totalCount').textContent = allResults.length;
     $('#profitCount').textContent = filtered.length;
@@ -552,8 +586,8 @@
     const avg = profits.reduce((a, b) => a + b, 0) / profits.length;
     const max = Math.max(...profits);
 
-    $('#avgProfit').textContent = `$${avg.toFixed(2)}`;
-    $('#maxProfit').textContent = `$${max.toFixed(2)}`;
+    $('#avgProfit').textContent = `$${(avg || 0).toFixed(2)}`;
+    $('#maxProfit').textContent = `$${(max || 0).toFixed(2)}`;
 
     let html = `
       <div class="table-wrapper">
@@ -565,6 +599,7 @@
               <th data-sort="steam_price">Steam (-15%) <span class="sort-icon">↕</span></th>
               <th data-sort="profit_usd">Profit $ <span class="sort-icon">↕</span></th>
               <th data-sort="profit_percent">Profit % <span class="sort-icon">↕</span></th>
+              <th data-sort="steam_volume">Vol. Steam <span class="sort-icon">↕</span></th>
               <th data-sort="quantity">Stock <span class="sort-icon">↕</span></th>
               <th></th>
             </tr>
@@ -577,10 +612,11 @@
       html += `
         <tr style="animation:rowIn 0.3s ease-out ${Math.min(idx * 0.05, 1.5)}s forwards; opacity:0">
           <td class="skin-name">${r.market_name}</td>
-          <td class="price-csfloat">$${r.csfloat_price.toFixed(2)}</td>
-          <td class="price-steam">$${r.steam_price.toFixed(2)}</td>
-          <td class="${pClass}">+$${r.profit_usd.toFixed(2)}</td>
-          <td class="${pClass}">${r.profit_percent.toFixed(0)}%</td>
+          <td class="price-csfloat">$${(r.csfloat_price || 0).toFixed(2)}</td>
+          <td class="price-steam">$${(r.steam_price || 0).toFixed(2)}</td>
+          <td class="${pClass}">+$${(r.profit_usd || 0).toFixed(2)}</td>
+          <td class="${pClass}">${(r.profit_percent || 0).toFixed(0)}%</td>
+          <td class="qty" style="color:${(r.steam_volume || 0) > 0 ? 'var(--accent-3)' : 'var(--text-muted)'}">${(r.steam_volume || 0) > 0 ? (r.steam_volume).toLocaleString() : '—'}</td>
           <td class="qty">${r.quantity}</td>
           <td class="cell-actions">
             <a href="https://csfloat.com/search?market_hash_name=${encodeURIComponent(r.market_name)}"
@@ -594,18 +630,30 @@
 
     html += '</tbody></table></div>';
     resultsContainer.innerHTML = html;
+
+    // Update header sort visual indicator
+    if (sortColumn) {
+      const activeTh = resultsContainer.querySelector(`th[data-sort="${CSS.escape(sortColumn)}"]`);
+      if (activeTh) {
+        activeTh.classList.add('sorted');
+        const icon = activeTh.querySelector('.sort-icon');
+        if (icon) icon.textContent = sortDirection === 'desc' ? '↓' : '↑';
+      }
+    }
   }
 
-  // ===== EVENT DELEGATION (reemplaza los inline onclick) =====
-  // Ordenar tabla por click en headers
+  // ===== HEADER CLICK SORT: SteamFarm =====
+  // Ordenar tabla por click en headers (toggle asc/desc, indicador visual)
   resultsContainer.addEventListener('click', (e) => {
     const th = e.target.closest('th[data-sort]');
     if (th) {
       const key = th.dataset.sort;
-      allResults.sort((a, b) => {
-        if (typeof a[key] === 'string') return a[key].localeCompare(b[key]);
-        return b[key] - a[key];
-      });
+      if (sortColumn === key) {
+        sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        sortColumn = key;
+        sortDirection = 'desc';
+      }
       renderResults();
     }
   });
@@ -628,11 +676,18 @@
   });
 
   // ===== FILTROS EN TIEMPO REAL =====
-  [profitFilter, minPrice, maxPrice, categoryFilter, profitSort].forEach(el => {
+  [profitFilter, minPrice, maxPrice, categoryFilter, profitSort, profitMostSold].forEach(el => {
     if (el) el.addEventListener('change', () => {
       if (allResults.length > 0) renderResults();
     });
   });
+  // Checkbox: also listen for click to persist
+  if (profitMostSold) {
+    profitMostSold.addEventListener('click', () => {
+      localStorage.setItem('profitMostSold', profitMostSold.checked ? 'true' : '');
+      if (allResults.length > 0) renderResults();
+    });
+  }
 
   // ===== LOCAL STORAGE =====
   ['profitFilter', 'minPrice', 'maxPrice', 'categoryFilter', 'maxItemsFilter', 'profitSort'].forEach(id => {
@@ -641,6 +696,11 @@
     if (el && saved) el.value = saved;
     if (el) el.addEventListener('change', () => localStorage.setItem(id, el.value));
   });
+  // Restore profitMostSold checkbox
+  if (profitMostSold) {
+    const savedMost = localStorage.getItem('profitMostSold');
+    if (savedMost === 'true') profitMostSold.checked = true;
+  }
 
   // ===== INIT =====
   loadHistory();
@@ -677,6 +737,7 @@
   const capCategory = $('#capCategory');
   const capLimit = $('#capLimit');
   const capSort = $('#capSort');
+  const capMostSold = $('#capMostSold');
   const capProgress = $('#capProgress');
   const capStatus = $('#capStatus');
   const capProgressFill = $('#capProgressFill');
@@ -687,30 +748,7 @@
   let capTimerInterval = null;
   let capStartTime = null;
 
-  // ===== TAB SWITCHING =====
-  function switchToTab(mode) {
-    const tab = document.querySelector(`.tab[data-mode="${mode}"]`);
-    if (!tab) return;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('profitMode').style.display = mode === 'profit' ? 'block' : 'none';
-    document.getElementById('capitalletMode').style.display = mode === 'capitallet' ? 'block' : 'none';
-  }
-
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      switchToTab(tab.dataset.mode);
-    });
-  });
-
-  // Leer ?mode= del URL y seleccionar tab inicial
-  (function initTabFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    if (mode === 'capitallet' || mode === 'profit') {
-      switchToTab(mode);
-    }
-  })();
+  // (mode switching is handled by init.js via switchMode())
 
   // ===== CAPITALLET SCAN =====
   if (capScanBtn) {
@@ -739,21 +777,36 @@
     const minPriceVal = parseFloat(capMinPrice.value || '0');
     const maxPriceVal = parseFloat(capMaxPrice.value || '99999');
     const sortBy = capSort ? capSort.value : 'diff-asc';
+    const mostSoldOnly = capMostSold ? capMostSold.checked : false;
 
     let filtered = capResults.filter(r =>
       Math.abs(r.diff_pct) <= maxDiff &&
-      r.csfloat_price >= minPriceVal &&
-      r.csfloat_price <= maxPriceVal
+      r.steam_price >= minPriceVal &&
+      r.steam_price <= maxPriceVal &&
+      (!mostSoldOnly || (r.steam_volume || 0) > 0)
     );
 
     // Sort
-    const sortFns = {
+    const capSortFns = {
       'diff-asc': (a, b) => Math.abs(a.diff_pct) - Math.abs(b.diff_pct),
       'diff-desc': (a, b) => Math.abs(b.diff_pct) - Math.abs(a.diff_pct),
       'csfloat-asc': (a, b) => a.csfloat_price - b.csfloat_price,
       'csfloat-desc': (a, b) => b.csfloat_price - a.csfloat_price,
+      'volume-desc': (a, b) => (b.steam_volume || 0) - (a.steam_volume || 0),
     };
-    filtered.sort(sortFns[sortBy] || sortFns['diff-asc']);
+    filtered.sort(capSortFns[sortBy] || capSortFns['diff-asc']);
+
+    // Override with header click sort if active
+    if (capSortColumn) {
+      filtered.sort((a, b) => {
+        const va = a[capSortColumn];
+        const vb = b[capSortColumn];
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'string') return capSortDirection === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb);
+        return capSortDirection === 'desc' ? vb - va : va - vb;
+      });
+    }
 
     // Stats
     document.getElementById('capTotalCount').textContent = capResults.length;
@@ -786,8 +839,8 @@
     const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
     const minDiff = Math.min(...diffs.map(Math.abs));
 
-    document.getElementById('capAvgDiff').textContent = `$${Math.abs(avg).toFixed(2)}`;
-    document.getElementById('capBestDiff').textContent = `$${minDiff.toFixed(2)}`;
+    document.getElementById('capAvgDiff').textContent = `$${(Math.abs(avg) || 0).toFixed(2)}`;
+    document.getElementById('capBestDiff').textContent = `$${(minDiff || 0).toFixed(2)}`;
 
     let html = `
       <div class="table-wrapper">
@@ -795,10 +848,11 @@
           <thead>
             <tr>
               <th data-cap-sort="market_name">Item <span class="sort-icon">↕</span></th>
-              <th data-cap-sort="csfloat_price">CSFloat <span class="sort-icon">↕</span></th>
               <th data-cap-sort="steam_price">Steam <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="csfloat_price">CSFloat (-2%) <span class="sort-icon">↕</span></th>
               <th data-cap-sort="diff_usd">Dif. $ <span class="sort-icon">↕</span></th>
               <th data-cap-sort="diff_pct">Dif. % <span class="sort-icon">↕</span></th>
+              <th data-cap-sort="steam_volume">Vol. Steam <span class="sort-icon">↕</span></th>
               <th data-cap-sort="quantity">Stock <span class="sort-icon">↕</span></th>
               <th></th>
             </tr>
@@ -807,24 +861,27 @@
     `;
 
     filtered.forEach((r, idx) => {
-      const diffClass = getCapDiffClass(Math.abs(r.diff_pct));
+      const absDiff = Math.abs(r.diff_pct);
+      const isIdeal = absDiff < 0.5;
+      const diffClass = isIdeal ? 'ideal' : getCapDiffClass(absDiff);
       const isGain = r.diff_usd >= 0;
       const diffSign = isGain ? '+' : '';
       const dirEmoji = isGain ? '🟢' : '🔴';
       const dirLabel = isGain ? 'GANANCIA' : 'PÉRDIDA';
-      const diffColor = Math.abs(r.diff_pct) <= 1 ? 'cap-positive' : Math.abs(r.diff_pct) <= 3 ? 'cap-neutral' : 'cap-negative';
+      const diffColor = absDiff <= 1 ? 'cap-positive' : absDiff <= 3 ? 'cap-neutral' : 'cap-negative';
       const rowClass = isGain ? 'cap-row-gain' : 'cap-row-loss';
       html += `
         <tr class="${rowClass}" style="animation:rowIn 0.3s ease-out ${Math.min(idx * 0.05, 1.5)}s forwards; opacity:0">
-          <td class="skin-name">${r.market_name}</td>
-          <td class="price-csfloat">$${r.csfloat_price.toFixed(2)}</td>
-          <td class="price-steam">$${r.steam_price.toFixed(2)}</td>
+          <td class="skin-name">${r.market_name || ''}</td>
+          <td class="price-steam">$${(r.steam_price || 0).toFixed(2)}</td>
+          <td class="price-csfloat">$${(r.csfloat_price || 0).toFixed(2)} <span style="color:var(--text-muted);font-size:0.6rem">(-2%)</span></td>
           <td class="${diffColor}">
             <span class="dir-indicator ${isGain ? 'gain' : 'loss'}" title="${dirLabel}">${dirEmoji}</span>
-            ${diffSign}$${r.diff_usd.toFixed(2)}
+            ${diffSign}$${(r.diff_usd || 0).toFixed(2)}
           </td>
-          <td><span class="diff-badge ${diffClass}">${diffSign}${r.diff_pct.toFixed(1)}%</span></td>
-          <td class="qty">${r.quantity}</td>
+          <td><span class="diff-badge ${diffClass}">${Math.abs(r.diff_pct || 0) < 0.5 ? '⭐ ' : ''}${diffSign}${(r.diff_pct || 0).toFixed(1)}%</span></td>
+          <td class="qty" style="color:${(r.steam_volume || 0) > 0 ? 'var(--accent-3)' : 'var(--text-muted)'}">${(r.steam_volume || 0) > 0 ? (r.steam_volume).toLocaleString() : '—'}</td>
+          <td class="qty">${r.quantity || 0}</td>
           <td class="cell-actions">
             <a href="https://csfloat.com/search?market_hash_name=${encodeURIComponent(r.market_name)}"
                target="_blank" class="action-link" title="Ver en CSFloat"><img src="icons/csfloat-link.png" class="action-icon" alt="CSF"></a>
@@ -837,6 +894,16 @@
 
     html += '</tbody></table></div>';
     capResultsContainer.innerHTML = html;
+
+    // Update header sort visual indicator
+    if (capSortColumn) {
+      const activeTh = capResultsContainer.querySelector(`th[data-cap-sort="${CSS.escape(capSortColumn)}"]`);
+      if (activeTh) {
+        activeTh.classList.add('sorted');
+        const icon = activeTh.querySelector('.sort-icon');
+        if (icon) icon.textContent = capSortDirection === 'desc' ? '↓' : '↑';
+      }
+    }
   }
 
   async function startCapScan() {
@@ -857,6 +924,9 @@
     const sortBy = capSort?.value || 'diff-asc';
 
     try {
+      // CSFloat seller fee (2% for items under $500)
+      const CSFLOAT_FEE = 0.98;
+
       // Start capitallet timer
       if (capScanTimer) capScanTimer.textContent = '0:00';
       if (capTimerInterval) { clearInterval(capTimerInterval); capTimerInterval = null; }
@@ -869,8 +939,9 @@
       capProgressFill.style.width = '5%';
 
       const priceList = await fetchCSFloatPriceList();
-      const minPriceCents = minP * 100;
-      const maxPriceCents = maxP * 100;
+      // Buscamos candidatos con precio CSFloat de hasta $500
+      // El filtro de precio REAL (min/max) se aplica DESPUÉS sobre Steam
+      const CANDIDATE_CSFLOAT_MAX = 50000; // $500 en centavos
 
       capStatus.textContent = `📦 ${priceList.length} items obtenidos. Aplicando filtros...`;
       capProgressFill.style.width = '15%';
@@ -878,7 +949,7 @@
       let candidates = [];
       for (const item of priceList) {
         const cat = detectCategory(item.market_hash_name);
-        if (item.min_price < minPriceCents || item.min_price > maxPriceCents) continue;
+        if (item.min_price < 0 || item.min_price > CANDIDATE_CSFLOAT_MAX) continue;
         if (!item.quantity || item.quantity < 1) continue;
         if (category !== 'all' && cat !== category) continue;
         candidates.push({
@@ -903,8 +974,12 @@
         return;
       }
 
-      // Ordenar por precio ascendente para encontrar mejores coincidencias primero
-      candidates.sort((a, b) => a.priceCs - b.priceCs);
+      // Ordenar por score: items con más stock y menor precio tienen más chances en Steam
+      candidates.sort((a, b) => {
+        const scoreA = (a.quantity || 1) * (1 / Math.max(a.priceCs, 0.01));
+        const scoreB = (b.quantity || 1) * (1 / Math.max(b.priceCs, 0.01));
+        return scoreB - scoreA;
+      });
       const toScan = candidates.slice(0, limit);
       const totalToScan = toScan.length;
 
@@ -926,14 +1001,19 @@
         capStatus.textContent = `📊 Lote ${batchNum}/${totalBatches} | Verificando ${batch.length} items... (${capResults.length} coincidencias)`;
 
         const promises = batch.map(async (item) => {
-          const steamPriceRaw = await fetchSteamPrice(item.name);
+          const steamResult = await fetchSteamPrice(item.name);
+          const steamPriceRaw = steamResult ? steamResult.price : null;
+          const steamVolume = steamResult ? steamResult.volume : 0;
           if (steamPriceRaw) {
-            const diff = item.priceCs - steamPriceRaw;
-            const diffPct = ((item.priceCs - steamPriceRaw) / steamPriceRaw) * 100;
+            // Lo que recibís al vender en CSFloat: precio × 0.98 (-2% fee)
+            const csfloatAfterFee = item.priceCs * CSFLOAT_FEE;
+            const diff = csfloatAfterFee - steamPriceRaw;
+            const diffPct = ((csfloatAfterFee - steamPriceRaw) / steamPriceRaw) * 100;
             return {
               market_name: item.name,
-              csfloat_price: item.priceCs,
+              csfloat_price: csfloatAfterFee, // ya incluye el -2%
               steam_price: steamPriceRaw,
+              steam_volume: steamVolume,
               diff_usd: diff,
               diff_pct: diffPct,
               quantity: item.quantity,
@@ -944,7 +1024,11 @@
         });
 
         const batchResults = await Promise.all(promises);
-        batchResults.filter(Boolean).forEach(r => capResults.push(r));
+
+        // Filter by Steam price range (the user's min/max applies to Steam)
+        const steamFiltered = batchResults.filter(r => r !== null && r.steam_price >= minP && r.steam_price <= maxP);
+
+        steamFiltered.forEach(r => capResults.push(r));
         renderCapResults();
         if (capScanCounter) capScanCounter.textContent = Math.min(i + BATCH_SIZE, totalToScan);
 
@@ -954,6 +1038,9 @@
       }
 
       const wasStopped = !capScanning;
+
+      // Ordenar por menor diferencia antes de guardar en historial
+      capResults.sort((a, b) => Math.abs(a.diff_pct) - Math.abs(b.diff_pct));
 
       // Guardar en historial Capitallet (siempre, incluso si se detuvo)
       if (capResults.length > 0 || totalToScan > 0) {
@@ -1004,12 +1091,50 @@
     capScanning = false;
   }
 
+  // ===== HEADER CLICK SORT + ROW CLICK → STEAM: Capitallet =====
+  if (capResultsContainer) {
+    capResultsContainer.addEventListener('click', (e) => {
+      // Click en header → ordenar
+      const th = e.target.closest('th[data-cap-sort]');
+      if (th) {
+        const key = th.dataset.capSort;
+        if (capSortColumn === key) {
+          capSortDirection = capSortDirection === 'desc' ? 'asc' : 'desc';
+        } else {
+          capSortColumn = key;
+          capSortDirection = 'desc';
+        }
+        renderCapResults();
+        return;
+      }
+      // Click en cualquier otra parte de la fila (tr) → abrir Steam
+      // No interferir con los action-links (los iconos CSFloat/Steam)
+      const actionLink = e.target.closest('.action-link');
+      if (!actionLink) {
+        const row = e.target.closest('tr');
+        if (row) {
+          const steamLink = row.querySelector('.action-link.steam');
+          if (steamLink) {
+            window.open(steamLink.href, '_blank');
+          }
+        }
+      }
+    });
+  }
+
   // ===== CAPITALLET FILTROS EN TIEMPO REAL =====
-  [capMaxDiff, capMinPrice, capMaxPrice, capCategory, capSort].forEach(el => {
+  [capMaxDiff, capMinPrice, capMaxPrice, capCategory, capSort, capMostSold].forEach(el => {
     if (el) el.addEventListener('change', () => {
       if (capResults.length > 0) renderCapResults();
     });
   });
+  // Checkbox fires 'change' but not always reliably, also listen for 'click'
+  if (capMostSold) {
+    capMostSold.addEventListener('click', () => {
+      localStorage.setItem('capMostSold', capMostSold.checked ? 'true' : '');
+      if (capResults.length > 0) renderCapResults();
+    });
+  }
 
   // ===== CAPITALLET LOCAL STORAGE =====
   ['capMaxDiff', 'capMinPrice', 'capMaxPrice', 'capCategory', 'capLimit', 'capSort'].forEach(id => {
@@ -1018,6 +1143,11 @@
     if (el && saved) el.value = saved;
     if (el) el.addEventListener('change', () => localStorage.setItem(id, el.value));
   });
+  // Restore capMostSold checkbox
+  if (capMostSold) {
+    const savedMost = localStorage.getItem('capMostSold');
+    if (savedMost === 'true') capMostSold.checked = true;
+  }
 
   // ================================================================
   // ===== CAPITALLET HISTORIAL =====
@@ -1175,8 +1305,8 @@
                 <div class="history-top-item">
                   <span class="ht-rank">#${i + 1}</span>
                   <span class="ht-name">${t.name}</span>
-                  <span class="ht-pct ${Math.abs(t.diffPct) <= 1 ? 'green' : Math.abs(t.diffPct) <= 3 ? 'yellow' : ''}">${t.diffPct >= 0 ? '+' : ''}${t.diffPct.toFixed(1)}%</span>
-                  <span class="ht-usd">${t.diff >= 0 ? '+' : ''}$${t.diff.toFixed(2)}</span>
+                  <span class="ht-pct ${Math.abs(t.diffPct || 0) <= 1 ? 'green' : Math.abs(t.diffPct || 0) <= 3 ? 'yellow' : ''}">${(t.diffPct || 0) >= 0 ? '+' : ''}${(t.diffPct || 0).toFixed(1)}%</span>
+                  <span class="ht-usd">${(t.diff || 0) >= 0 ? '+' : ''}$${(t.diff || 0).toFixed(2)}</span>
                 </div>
               `).join('')}
             </div>

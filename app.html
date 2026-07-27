@@ -42,6 +42,16 @@
       overflow: hidden;
     }
 
+    /* ===== PAGE ENTRANCE ANIMATION ===== */
+    body.page-loading .filter-card {
+      opacity: 0;
+    }
+
+    body.page-loading .mode-col {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
     /* ===== ANIMATED BACKGROUND ===== */
     body::before {
       content: '';
@@ -75,7 +85,7 @@
       gap: 8px;
 
       height: 100dvh;
-      transition: grid-template-columns 0.3s ease;
+      transition: grid-template-columns 0.2s ease;
     }
 
     .dashboard.mode-profit {
@@ -123,7 +133,7 @@
       flex-direction: column;
       gap: 10px;
       flex: 1;
-      transition: border-color var(--transition);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .filter-card:hover { border-color: var(--border-hover); }
@@ -231,7 +241,7 @@
       border-radius: var(--radius);
       padding: 16px;
       backdrop-filter: blur(8px);
-      transition: border-color var(--transition);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -259,6 +269,7 @@
       gap: 8px;
       padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .mode-header .mode-title {
@@ -358,6 +369,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 4px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .mode-stats .stat-card {
@@ -544,6 +556,7 @@
       flex: 1;
       overflow-y: auto;
       min-height: 100px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .mode-results .empty-state {
@@ -647,6 +660,9 @@
 
     .mode-results tr:last-child td { border-bottom: none; }
     .mode-results tr:hover { background: rgba(255,107,53,0.03); }
+
+    /* Capitallet rows are clickable → opens Steam */
+    .cap-col .mode-results tr { cursor: pointer; }
 
     .mode-results tr.animate-in {
       animation: rowIn 0.3s ease-out forwards;
@@ -793,6 +809,18 @@
     .diff-badge.far {
       background: rgba(255,136,0,0.12);
       color: var(--profit-orange);
+    }
+
+    .diff-badge.ideal {
+      background: rgba(255,215,0,0.15);
+      color: #ffd700;
+      box-shadow: 0 0 10px rgba(255,215,0,0.2);
+      animation: starPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes starPulse {
+      0%, 100% { box-shadow: 0 0 6px rgba(255,215,0,0.15); }
+      50% { box-shadow: 0 0 14px rgba(255,215,0,0.35); }
     }
 
     .dir-indicator {
@@ -1071,11 +1099,20 @@
     .mode-col .mode-title {
       cursor: pointer;
       user-select: none;
-      transition: opacity var(--transition);
+      transition: opacity var(--transition), text-shadow var(--transition);
     }
 
     .mode-col .mode-title:hover {
       opacity: 0.8;
+    }
+
+    .mode-col.inactive .mode-title {
+      text-shadow: 0 0 8px rgba(168,85,247,0.4), 0 0 16px rgba(168,85,247,0.15);
+    }
+
+    .mode-col.inactive .mode-title:hover {
+      text-shadow: 0 0 14px rgba(168,85,247,0.6), 0 0 30px rgba(168,85,247,0.3);
+      opacity: 0.85;
     }
 
     .mode-col.inactive {
@@ -1083,9 +1120,7 @@
       min-width: 280px;
       padding: 16px;
       opacity: 0.55;
-      border-color: var(--accent-1);
-      box-shadow: inset 0 0 0 1px var(--glow-orange);
-      transition: all 0.3s ease;
+      border-color: var(--border);
     }
 
     .mode-col.inactive .mode-header {
@@ -1118,6 +1153,15 @@
       justify-content: center;
       gap: 3px;
       min-height: 110px;
+    }
+
+    /* ===== INTENSE GLOW ON SCAN BUTTON FOR ACTIVE MODE ===== */
+    .mode-col.active .mode-header .btn-primary {
+      box-shadow: 0 4px 18px var(--glow-orange), 0 0 30px rgba(255,107,53,0.25);
+    }
+
+    .mode-col.active .mode-header .btn-primary:hover {
+      box-shadow: 0 6px 24px var(--glow-orange), 0 0 36px rgba(255,107,53,0.3);
     }
 
     .mode-col.inactive .mode-stats .stat-icon {
@@ -1284,7 +1328,32 @@
 
     .mode-col.active {
       opacity: 1;
-      transition: all 0.3s ease;
+      border-color: var(--accent-1);
+      box-shadow: 0 0 12px var(--glow-orange), inset 0 0 20px rgba(255,107,53,0.05);
+    }
+
+    /* ===== FILTER CARD ACTIVE / INACTIVE STATES ===== */
+    .filter-card-active {
+      border-color: var(--accent-1);
+      box-shadow: 0 0 12px var(--glow-orange), inset 0 0 20px rgba(255,107,53,0.05);
+      transform: scale(1.01);
+    }
+
+    .filter-card-active .filter-card-header {
+      color: var(--accent-1);
+      transition: color 0.35s ease;
+    }
+
+    .filter-card-inactive {
+      opacity: 0.55;
+      border-color: var(--border);
+      transform: scale(1);
+      box-shadow: none;
+    }
+
+    .filter-card-inactive:hover {
+      opacity: 0.7;
+      border-color: var(--border-hover);
     }
 
     .filter-card-header {
@@ -1325,7 +1394,7 @@
     }
   </style>
 </head>
-<body>
+<body class="page-loading">
   <div class="dashboard">
     <!-- ===== COLUMN 1: BRAND (logo + lettering) ===== -->
     <div class="brand-col">
@@ -1334,7 +1403,7 @@
 
     <!-- ===== COLUMN 1: FILTERS ===== -->
     <div class="filters-col">
-      <div class="filter-card">
+      <div class="filter-card" data-mode="profit">
         <div class="filter-card-header">💵 SteamFarm</div>
         <div class="filter-card-body">
         <div class="filter-group">
@@ -1383,6 +1452,13 @@
           </select>
         </div>
         <div class="filter-group">
+          <label>🔥 Más vend.</label>
+          <div class="filter-row" style="gap:4px">
+            <input type="checkbox" id="profitMostSold" style="width:auto;flex:none;margin:0;accent-color:var(--accent-1)">
+            <label for="profitMostSold" style="font-size:0.72rem;color:var(--text-secondary);text-transform:none;letter-spacing:0;font-weight:500;min-width:0;cursor:pointer">Solo items con volumen</label>
+          </div>
+        </div>
+        <div class="filter-group">
           <label>Orden</label>
           <select id="profitSort">
             <option value="profit-desc">⬇ Profit % ↓</option>
@@ -1393,12 +1469,13 @@
             <option value="csfloat-desc">⬇ CSFloat ↓</option>
             <option value="stock-desc">⬇ Stock ↓</option>
             <option value="stock-asc">⬆ Stock ↑</option>
+            <option value="volume-desc">🔥 Más vendidos</option>
           </select>
         </div>
       </div>
       </div>
 
-      <div class="filter-card">
+      <div class="filter-card" data-mode="capitallet">
         <div class="filter-card-header">💰 Capitallet</div>
         <div class="filter-card-body">
         <div class="filter-group">
@@ -1420,12 +1497,12 @@
         </div>
         <div class="filter-group filter-group-price">
           <div class="price-row-1">
-            <label>Precio CSFloat</label>
+            <label>Precio Steam</label>
             <input type="number" id="capMinPrice" value="3" min="0" max="10000" step="0.5">
             <span class="unit">—</span>
           </div>
           <div class="price-row-2">
-            <input type="number" id="capMaxPrice" value="100" min="1" max="50000" step="0.5">
+            <input type="number" id="capMaxPrice" value="125" min="1" max="50000" step="0.5">
             <span class="unit">USD</span>
           </div>
         </div>
@@ -1447,12 +1524,20 @@
           </select>
         </div>
         <div class="filter-group">
+          <label>🔥 Más vend.</label>
+          <div class="filter-row" style="gap:4px">
+            <input type="checkbox" id="capMostSold" style="width:auto;flex:none;margin:0;accent-color:var(--accent-1)">
+            <label for="capMostSold" style="font-size:0.72rem;color:var(--text-secondary);text-transform:none;letter-spacing:0;font-weight:500;min-width:0;cursor:pointer">Solo items con volumen</label>
+          </div>
+        </div>
+        <div class="filter-group">
           <label>Orden</label>
           <select id="capSort">
             <option value="diff-asc">⬆ Menor dif.</option>
             <option value="diff-desc">⬇ Mayor dif.</option>
             <option value="csfloat-asc">⬆ CSFloat ↑</option>
             <option value="csfloat-desc">⬇ CSFloat ↓</option>
+            <option value="volume-desc">🔥 Más vendidos</option>
           </select>
         </div>
       </div>
@@ -1631,7 +1716,7 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer">
-      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v2.3.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v2.6.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
     </footer>
   </div>
 

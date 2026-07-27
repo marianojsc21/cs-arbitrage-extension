@@ -19,6 +19,20 @@ function switchMode(mode) {
     dashboard.classList.remove('mode-profit');
     dashboard.classList.add('mode-capitallet');
   }
+  // Highlight the corresponding filter card
+  updateFilterCardHighlight(mode);
+}
+
+function updateFilterCardHighlight(mode) {
+  document.querySelectorAll('.filters-col .filter-card').forEach(card => {
+    if (card.dataset.mode === mode) {
+      card.classList.add('filter-card-active');
+      card.classList.remove('filter-card-inactive');
+    } else {
+      card.classList.remove('filter-card-active');
+      card.classList.add('filter-card-inactive');
+    }
+  });
 }
 
 // Event delegation for mode switching (no inline onclick to avoid CSP)
@@ -113,13 +127,14 @@ function renderHistoricalTop5() {
         const valClass = Math.abs(item.diffPct || 0) <= 1 ? 'green' : 'orange';
         const rank = rankClass(i);
         const diff = (item.diff || 0);
+        const diffSign = diff >= 0 ? '+' : '';
         return `<div class="ht5-item" data-name="${item.name.replace(/"/g, '&quot;')}">
           <div class="ht5-item-top">
             <span class="ht5-rank ${rank}">#${i + 1}</span>
             <span class="ht5-name">${item.name}</span>
           </div>
           <div class="ht5-item-bottom">
-            <span class="ht5-usd ${diff >= 0 ? 'green' : ''}">${diff >= 0 ? '+' : ''}$${Math.abs(diff).toFixed(2)}</span>
+            <span class="ht5-usd ${diff >= 0 ? 'green' : ''}">${diffSign}$${Math.abs(diff).toFixed(2)}</span>
             <span class="ht5-value ${valClass}">${item.diffPct >= 0 ? '+' : ''}${(item.diffPct || 0).toFixed(1)}%</span>
           </div>
         </div>`;
@@ -128,20 +143,49 @@ function renderHistoricalTop5() {
   }
 }
 
-// Event delegation: click on Top 7 item → open CSFloat
-function openItemCSFloat(e) {
+// Event delegation: click on Top 7 item → open link según modo activo
+function openTopItem(e) {
   const item = e.target.closest('.ht5-item');
   if (!item) return;
   const name = item.dataset.name;
   if (!name) return;
-  const url = `https://csfloat.com/search?market_hash_name=${encodeURIComponent(name)}`;
-  window.open(url, '_blank');
+
+  // Determinar si estamos en modo Capitallet
+  const capCol = document.querySelector('.cap-col');
+  const isCapitallet = capCol && capCol.classList.contains('active');
+
+  if (isCapitallet) {
+    // En Capitallet → abrir Steam
+    const url = `https://steamcommunity.com/market/listings/730/${encodeURIComponent(name)}`;
+    window.open(url, '_blank');
+  } else {
+    // En SteamFarm → abrir CSFloat
+    const url = `https://csfloat.com/search?market_hash_name=${encodeURIComponent(name)}`;
+    window.open(url, '_blank');
+  }
 }
 
-document.addEventListener('click', openItemCSFloat);
+document.addEventListener('click', openTopItem);
 
-// Start with profit mode active by default
-switchMode('profit');
+// Read ?mode= from URL and switch to that mode, defaulting to profit
+function initModeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+  if (mode === 'capitallet' || mode === 'profit') {
+    switchMode(mode);
+  } else {
+    switchMode('profit');
+  }
+}
+initModeFromUrl();
+
+// Trigger entrance animation: double rAF guarantees one paint at opacity 0 first
+// then removing the class triggers the CSS transition (0 → target opacity)
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.body.classList.remove('page-loading');
+  });
+});
 
 // Render Top 5 from historical data (script runs at bottom of body, DOM is ready)
 renderHistoricalTop5();
