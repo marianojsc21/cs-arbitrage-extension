@@ -1,23 +1,31 @@
-// Mode switching — now only toggles column width, filters are always visible
+// Mode switching — now shows columns (1 active, rest minimized)
 function switchMode(mode) {
   const profitCol = document.querySelector('.profit-col');
-  const capCol = document.querySelector('.cap-col');
+  const invCol = document.querySelector('.invest-col');
+  const sniperCol = document.querySelector('.sniper-col');
   const dashboard = document.querySelector('.dashboard');
 
+  // Remove all mode-specific classes
+  dashboard.classList.remove('mode-profit', 'mode-invest', 'mode-sniper');
+
+  // Reset ALL columns: visible + inactive
+  [profitCol, invCol, sniperCol].forEach(col => {
+    if (col) {
+      col.classList.remove('active');
+      col.classList.add('inactive');
+      col.style.display = '';
+    }
+  });
+
   if (mode === 'profit') {
-    profitCol.classList.remove('inactive');
-    profitCol.classList.add('active');
-    capCol.classList.remove('active');
-    capCol.classList.add('inactive');
-    dashboard.classList.remove('mode-capitallet');
+    if (profitCol) { profitCol.classList.remove('inactive'); profitCol.classList.add('active'); }
     dashboard.classList.add('mode-profit');
-  } else {
-    capCol.classList.remove('inactive');
-    capCol.classList.add('active');
-    profitCol.classList.remove('active');
-    profitCol.classList.add('inactive');
-    dashboard.classList.remove('mode-profit');
-    dashboard.classList.add('mode-capitallet');
+  } else if (mode === 'invest') {
+    if (invCol) { invCol.classList.remove('inactive'); invCol.classList.add('active'); }
+    dashboard.classList.add('mode-invest');
+  } else if (mode === 'sniper') {
+    if (sniperCol) { sniperCol.classList.remove('inactive'); sniperCol.classList.add('active'); }
+    dashboard.classList.add('mode-sniper');
   }
   // Highlight the corresponding filter card
   updateFilterCardHighlight(mode);
@@ -35,11 +43,29 @@ function updateFilterCardHighlight(mode) {
   });
 }
 
-// Event delegation for mode switching (no inline onclick to avoid CSP)
+// Event delegation for mode switching and logo click (no inline onclick to avoid CSP)
 document.addEventListener('click', (e) => {
+  // Logo/brand click → SteamFarm mode
+  const brandImage = e.target.closest('.brand-col img, .brand-col .brand-image');
+  if (brandImage) {
+    switchMode('profit');
+    return;
+  }
+  // Mode title click → switch to that mode
   const modeTitle = e.target.closest('.mode-title[data-mode]');
   if (modeTitle) {
     switchMode(modeTitle.dataset.mode);
+    return;
+  }
+
+  // Filter card header click → switch to that mode (for inactive/minimized filters)
+  const filterCard = e.target.closest('.filter-card[data-mode]');
+  if (filterCard) {
+    const mode = filterCard.dataset.mode;
+    // Only switch if clicking an inactive card (active card click does nothing)
+    if (filterCard.classList.contains('filter-card-inactive')) {
+      switchMode(mode);
+    }
   }
 });
 
@@ -48,15 +74,8 @@ function renderHistoricalTop5() {
   // Load profit history
   let profitHistory = [];
   try {
-    const raw = localStorage.getItem('saintprofit_history');
+    const raw = StorageHelper.getItem('saintprofit_history');
     if (raw) profitHistory = JSON.parse(raw);
-  } catch(e) {}
-
-  // Load capitallet history
-  let capHistory = [];
-  try {
-    const raw = localStorage.getItem('saintprofit_cap_history');
-    if (raw) capHistory = JSON.parse(raw);
   } catch(e) {}
 
   // Profit Top 5: aggregate all topResults sorted by profit% desc
@@ -103,39 +122,92 @@ function renderHistoricalTop5() {
     }
   }
 
-  // Capitallet Top 5: aggregate by smallest difference
-  const allCapItems = [];
-  const seenCap = new Set();
-  for (const entry of capHistory) {
-    const top = entry.topResults || [];
+  // Smart Invest Top 7: aggregate by highest score from history
+  let invHistory = [];
+  try {
+    const raw = StorageHelper.getItem('saintprofit_invest_history');
+    if (raw) invHistory = JSON.parse(raw);
+  } catch(e) {}
+
+  const allInvItems = [];
+  const seenInv = new Set();
+  for (const entry of invHistory) {
+    const top = entry.topCombinations || [];
     for (const item of top) {
-      if (!seenCap.has(item.name)) {
-        seenCap.add(item.name);
-        allCapItems.push({ ...item });
+      const key = item.items ? item.items.join('|') : item.score + '_' + item.cost;
+      if (!seenInv.has(key)) {
+        seenInv.add(key);
+        allInvItems.push({ ...item });
       }
     }
   }
-  allCapItems.sort((a, b) => Math.abs(a.diffPct || 0) - Math.abs(b.diffPct || 0));
-  const capTop5 = allCapItems.slice(0, 7);
+  allInvItems.sort((a, b) => (b.score || 0) - (a.score || 0));
+  const invTop7 = allInvItems.slice(0, 7);
 
-  const capList = document.getElementById('capHt5List');
-  if (capList) {
-    if (capTop5.length === 0) {
-      capList.innerHTML = '<div class="ht5-empty">Sin datos históricos</div>';
+  const invList = document.getElementById('invHt5List');
+  if (invList) {
+    if (invTop7.length === 0) {
+      invList.innerHTML = '<div class="ht5-empty">Sin datos históricos</div>';
     } else {
-      capList.innerHTML = capTop5.map((item, i) => {
-        const valClass = Math.abs(item.diffPct || 0) <= 1 ? 'green' : 'orange';
+      invList.innerHTML = invTop7.map((item, i) => {
         const rank = rankClass(i);
-        const diff = (item.diff || 0);
-        const diffSign = diff >= 0 ? '+' : '';
-        return `<div class="ht5-item" data-name="${item.name.replace(/"/g, '&quot;')}">
+        const name = item.items ? item.items[0] : ('Combo #' + (i + 1));
+        const itemsCount = item.itemCount || (item.items ? item.items.length : 1);
+        return `<div class="ht5-item" data-name="${name.replace(/"/g, '&quot;')}">
           <div class="ht5-item-top">
             <span class="ht5-rank ${rank}">#${i + 1}</span>
-            <span class="ht5-name">${item.name}</span>
+            <span class="ht5-name">${itemsCount > 1 ? '📦 ' : ''}${name}${itemsCount > 1 ? ' +' + (itemsCount - 1) : ''}</span>
           </div>
           <div class="ht5-item-bottom">
-            <span class="ht5-usd ${diff >= 0 ? 'green' : ''}">${diffSign}$${Math.abs(diff).toFixed(2)}</span>
-            <span class="ht5-value ${valClass}">${item.diffPct >= 0 ? '+' : ''}${(item.diffPct || 0).toFixed(1)}%</span>
+            <span class="ht5-usd">$${(item.profitUsd || 0).toFixed(2)}</span>
+            <span class="ht5-value green">${(item.profitPct || 0).toFixed(1)}%</span>
+            <span class="ht5-value" style="color:var(--accent-1);font-weight:700;font-size:0.55rem">${(item.score || 0)}pts</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Cross-Market Opportunities Top 7: aggregate by highest opportunity score
+  let sniperHistory = [];
+  try {
+    const raw = StorageHelper.getItem('saintprofit_opportunity_history');
+    if (raw) sniperHistory = JSON.parse(raw);
+  } catch(e) {}
+
+  const allSnipItems = [];
+  const seenSnip = new Set();
+  for (const entry of sniperHistory) {
+    const top = entry.topOpportunities || [];
+    for (const item of top) {
+      const key = item.marketName || (item.opportunityScore + '_' + item.netProfit);
+      if (!seenSnip.has(key)) {
+        seenSnip.add(key);
+        allSnipItems.push({ ...item });
+      }
+    }
+  }
+  allSnipItems.sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0));
+  const snipTop7 = allSnipItems.slice(0, 7);
+
+  const snipList = document.getElementById('snipHt5List');
+  if (snipList) {
+    if (snipTop7.length === 0) {
+      snipList.innerHTML = '<div class="ht5-empty">Sin datos históricos</div>';
+    } else {
+      snipList.innerHTML = snipTop7.map((item, i) => {
+        const rank = rankClass(i);
+        const name = item.marketName || ('Oportunidad #' + (i + 1));
+        const icon = item.hasCharms || item.hasStickers ? '🧩 ' : '🔥 ';
+        return `<div class="ht5-item" data-name="${name.replace(/"/g, '&quot;')}">
+          <div class="ht5-item-top">
+            <span class="ht5-rank ${rank}">#${i + 1}</span>
+            <span class="ht5-name">${icon}${name}</span>
+          </div>
+          <div class="ht5-item-bottom">
+            <span class="ht5-usd">+$${(item.netProfit || 0).toFixed(2)}</span>
+            <span class="ht5-value green">${(item.discountPct || 0).toFixed(0)}%</span>
+            <span class="ht5-value" style="color:var(--accent-1);font-weight:700;font-size:0.55rem">${(item.opportunityScore || 0)}pts</span>
           </div>
         </div>`;
       }).join('');
@@ -150,13 +222,19 @@ function openTopItem(e) {
   const name = item.dataset.name;
   if (!name) return;
 
-  // Determinar si estamos en modo Capitallet
-  const capCol = document.querySelector('.cap-col');
-  const isCapitallet = capCol && capCol.classList.contains('active');
+  // Determinar el modo activo
+  const invCol = document.querySelector('.invest-col');
+  const sniperCol = document.querySelector('.sniper-col');
+  const isInvest = invCol && invCol.classList.contains('active');
+  const isSniper = sniperCol && sniperCol.classList.contains('active');
 
-  if (isCapitallet) {
-    // En Capitallet → abrir Steam
-    const url = `https://steamcommunity.com/market/listings/730/${encodeURIComponent(name)}`;
+  if (isInvest) {
+    // En Smart Invest → abrir CSFloat (es donde se compra)
+    const url = `https://csfloat.com/search?market_hash_name=${encodeURIComponent(name)}`;
+    window.open(url, '_blank');
+  } else if (isSniper) {
+    // En Market Sniper → abrir CSFloat search
+    const url = `https://csfloat.com/search?market_hash_name=${encodeURIComponent(name)}`;
     window.open(url, '_blank');
   } else {
     // En SteamFarm → abrir CSFloat
@@ -171,7 +249,7 @@ document.addEventListener('click', openTopItem);
 function initModeFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode');
-  if (mode === 'capitallet' || mode === 'profit') {
+  if (mode === 'invest' || mode === 'profit' || mode === 'sniper') {
     switchMode(mode);
   } else {
     switchMode('profit');
@@ -187,8 +265,92 @@ requestAnimationFrame(() => {
   });
 });
 
-// Render Top 5 from historical data (script runs at bottom of body, DOM is ready)
-renderHistoricalTop5();
+// Render Top 5 from historical data — esperar a que StorageHelper termine migración
+function initHistoricalTop5() {
+  renderHistoricalTop5();
+
+  // Initialize Cross-Market Opportunity engine
+  if (document.querySelector('.sniper-col') && typeof window.initOpportunityEngine === 'function') {
+    window.initOpportunityEngine();
+  }
+}
+
+if (window.StorageHelper && !window.StorageHelper._ready) {
+  window.addEventListener('storage-ready', initHistoricalTop5);
+} else {
+  initHistoricalTop5();
+}
 
 // Expose function globally so app.js can call it after saving new scans
 window.renderHistoricalTop5 = renderHistoricalTop5;
+
+// ===== THEME SYSTEM =====
+const THEME_STORAGE_KEY = 'saintprofit_theme';
+const THEMES = ['saintprofit', 'night', 'amber'];
+
+function setTheme(theme) {
+  if (!THEMES.includes(theme)) theme = 'saintprofit';
+  document.documentElement.setAttribute('data-theme', theme);
+  StorageHelper.setItem(THEME_STORAGE_KEY, theme);
+
+  // Update popup items
+  document.querySelectorAll('.theme-popup-item').forEach(el => {
+    const isActive = el.dataset.themeVal === theme;
+    el.classList.toggle('active', isActive);
+  });
+
+  // Update toggle button dot + label
+  const dot = document.getElementById('themeDot');
+  const label = document.getElementById('themeLabel');
+  if (dot) {
+    dot.className = 'theme-dot ' + theme;
+  }
+  if (label) {
+    const names = { saintprofit: 'Tema', night: 'Night', amber: 'Amber' };
+    label.textContent = names[theme] || 'Tema';
+  }
+}
+
+// Load saved theme or default
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = StorageHelper.getItem(THEME_STORAGE_KEY);
+  setTheme(saved || 'saintprofit');
+});
+// Also run now if DOM already ready
+if (document.readyState !== 'loading') {
+  const saved = StorageHelper.getItem(THEME_STORAGE_KEY);
+  setTheme(saved || 'saintprofit');
+}
+
+// Theme toggle: click toggle button → show/hide popup, click item → set theme, click outside → close
+const themeToggle = document.getElementById('themeToggle');
+const themePopup = document.getElementById('themePopup');
+
+if (themeToggle && themePopup) {
+  themeToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    themePopup.classList.toggle('show');
+  });
+
+  themePopup.addEventListener('click', (e) => {
+    const item = e.target.closest('.theme-popup-item');
+    if (item) {
+      const theme = item.dataset.themeVal;
+      setTheme(theme);
+      themePopup.classList.remove('show');
+      showToastTheme(`🎨 Tema cambiado a ${theme === 'saintprofit' ? 'SaintProfit' : theme === 'night' ? 'Night' : 'Amber'}`, 'info');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!themeToggle.contains(e.target) && !themePopup.contains(e.target)) {
+      themePopup.classList.remove('show');
+    }
+  });
+}
+
+function showToastTheme(msg, type) {
+  if (typeof window._spToast === 'function') {
+    window._spToast(msg, type);
+  }
+}

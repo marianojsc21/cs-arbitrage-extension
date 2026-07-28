@@ -536,6 +536,9 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 
 | Versión | Cambios |
 |---|---|
+| **v3.5.0** | 🗄️ **StorageHelper** — historial persistente con `chrome.storage.local` + `localStorage` (dual-write, sobrevive reinstalaciones) · 🎯 Border sólido 2px en columna activa (reemplaza box-shadow clipado) · 📐 Columna de filtros 340px con espaciado general refinado · 🔲 Bordes de filtros al 45% opacidad · 🧩 Modo Smart Invest + Market Sniper · ⚡ Optimización scroll vertical · 🎨 Tema Night/Amber actualizados |
+| **v2.8.0** | 🧠 Smart Invest Engine v2 — Portfolio Optimizer con knapsack time-based · 🎯 Cross-Market Opportunity Engine con proveedores Steam/CSFloat · ⭐ Alertas Steam Sniper para cuchillos/guantes < $20 · 📊 Calculadora de capitalización compuesta |
+| **v2.7.0** | 🎨 **Sistema de temas**: SaintProfit (default), Night (ultra-dark), Amber (cálido) · Selector de tema en el footer · Persistencia en localStorage · Toast de notificación al cambiar |
 | **v2.6.0** | 🐛 `toFixed()` crash fix en ALL renders (17 llamadas protegidas) · Min price en Capitallet · README actualizado |
 | **v2.5.0** | 🔥 Click en filas de Capitallet → abre Steam · ⭐ Indicador de conversión ideal · Más vendidos en SteamFarm · Columna Vol. Steam en ambos modos |
 | **v2.4.0** | 🔥 Filtro "Más vendidos" para Capitallet · Columna Vol. Steam · Fix duplicado Dif. Máx. |

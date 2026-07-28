@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const versionTag = document.getElementById('versionTag');
   const btnProfit = document.getElementById('btnProfit');
-  const btnCapitallet = document.getElementById('btnCapitallet');
+  const btnInvest = document.getElementById('btnInvest');
+  const btnSniper = document.getElementById('btnSniper');
 
   // Mostrar versión actual
   versionTag.textContent = 'v' + chrome.runtime.getManifest().version;
@@ -11,8 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('app.html?mode=profit') });
   });
 
-  // Abrir Capitallet
-  btnCapitallet.addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('app.html?mode=capitallet') });
+  // Abrir Smart Invest
+  btnInvest?.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('app.html?mode=invest') });
+  });
+
+  // Abrir Market Sniper
+  btnSniper?.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('app.html?mode=sniper') });
   });
 });

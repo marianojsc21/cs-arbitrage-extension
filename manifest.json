@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SaintProfit",
-  "version": "2.6.0",
+  "version": "3.5.0",
   "description": "Encuentra skins CS2 con profit entre CSFloat y Steam Market — SaintProfit",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
@@ -10,7 +10,8 @@
     "storage",
     "activeTab",
     "tabs",
-    "alarms"
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://csfloat.com/*",
