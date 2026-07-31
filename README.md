@@ -1,6 +1,10 @@
 # 🏛️ SaintProfit — Arbitraje CS2 entre CSFloat y Steam Market
 
-**SaintProfit** (v3.7.0) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+> 🌐 **Sitio web de documentación:** [saintprofit — GitHub Pages](https://marianojsc21.github.io/cs-arbitrage-extension/) — guía visual de los 3 modos, instalación paso a paso y preguntas frecuentes, pensada para usuarios no técnicos.
+>
+> ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
+
+**SaintProfit** (v3.7.2) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
 Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
@@ -594,6 +598,8 @@ Si hay una versión más nueva, descarga los archivos actualizados y los almacen
 
 | Versión | Cambios |
 |---|---|
+| **v3.7.2** | 📤 Exportar/Importar historial de los 3 modos como JSON (backup y migración entre dispositivos) · Nuevo módulo js/history-io.js · Botones ⬇️/⬆️ en cada panel de historial · 🌐 Sitio web de documentación en GitHub Pages (docs/) |
+| **v3.7.1** | 🔢 Auto-update con comparación semántica de versiones (arregla 3.10.0 vs 3.9.0) · 🆕 Badge "Nueva versión disponible" en la app · FILES_TO_UPDATE completado con todos los JS |
 | **v3.7.0** | 📚 README actualizado · Limpieza de Capitallet (modo y filtros) · Botones de escaneo independientes en Sniper (CSFloat/Steam) · Motor Steam con FASE 1 (cuchillos/guantes < $20 con alerta) + FASE 2 (cross-market desde Steam) · Filtro estricto de charms dominantes · Rate limiting reforzado (cache compartido, lotes de 10, backoff 12s→45s, 5 retries) |
 | **v3.6.x** | Botones de escaneo separados por mercado en Sniper · Alertas Steam Sniper (overlay rojo + notificación) · Auto-scan de cuchillos/guantes cada 45s · Cache de listings compartido |
 | **v3.5.0** | 🗄️ StorageHelper — historial dual-write (`chrome.storage.local` + `localStorage`) · Modo Smart Invest + Market Sniper integrados · Tema Night/Amber actualizados · Columnas con glow |

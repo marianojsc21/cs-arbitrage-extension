@@ -1859,4 +1859,10 @@
   window.renderOpportunityHistory = renderHistory;
   window.startSteamSniperAutoScan = startSteamSniperAutoScan;
   window.stopSteamSniperAutoScan = stopSteamSniperAutoScan;
+  // Hook para History IO (export/import): recarga el historial desde storage
+  window.refreshSniperHistory = () => {
+    if (!engine) return;
+    engine._loadHistory();
+    renderHistory();
+  };
 })();

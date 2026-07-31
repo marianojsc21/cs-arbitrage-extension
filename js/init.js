@@ -360,3 +360,70 @@ function showToastTheme(msg, type) {
     window._spToast(msg, type);
   }
 }
+
+// ===== UPDATE BADGE =====
+// Muestra "🆕 Nueva versión disponible" en el footer cuando el auto-update
+// detecta una versión más nueva en GitHub. Clic → descarga la actualización.
+function initUpdateBadge() {
+  const badge = document.getElementById('updateBadge');
+  const versionEl = document.getElementById('updateBadgeVersion');
+  if (!badge || !versionEl) return;
+  if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+
+  function showBadge(remoteVersion) {
+    if (remoteVersion) versionEl.textContent = remoteVersion;
+    badge.style.display = 'inline-flex';
+  }
+
+  // 1) Lectura rápida del estado guardado por el service worker (sin red)
+  chrome.runtime.sendMessage({ action: 'getConfig' }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    if (resp && resp.updateAvailable) {
+      showBadge(resp.remoteVersion);
+      showToastTheme('🆕 Nueva versión disponible: v' + (resp.remoteVersion || ''), 'info');
+    }
+  });
+
+  // 2) Check en vivo contra GitHub (el SW también lo hace cada hora).
+  //    Si el check en vivo dice que ya NO hay update, ocultar el badge
+  //    por si getConfig leyó un storage viejo (hasta 1h de desfase).
+  chrome.runtime.sendMessage({ action: 'checkUpdate' }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    if (resp && resp.available) {
+      showBadge(resp.remote);
+    } else if (resp && !resp.available && !badge.classList.contains('updating')) {
+      badge.style.display = 'none';
+    }
+  });
+
+  // 3) Clic → descargar e instalar la actualización
+  badge.addEventListener('click', () => {
+    if (badge.classList.contains('updating')) return;
+    badge.classList.add('updating');
+    badge.textContent = '⏳ Actualizando...';
+    chrome.runtime.sendMessage({ action: 'performUpdate' }, (resp) => {
+      badge.classList.remove('updating');
+      if (resp && resp.success) {
+        badge.textContent = '✅ Actualizado a v' + resp.version;
+        showToastTheme('✅ Actualizado a v' + resp.version + '. Recargá la extensión (chrome://extensions) para aplicar los cambios.', 'success');
+        setTimeout(() => { badge.style.display = 'none'; }, 5000);
+      } else {
+        badge.textContent = '❌ Error al actualizar';
+        showToastTheme('❌ Error al actualizar: ' + ((resp && resp.error) || 'desconocido'), 'error');
+        // Restaurar badge para reintentar
+        const v = versionEl.textContent;
+        badge.textContent = '';
+        badge.appendChild(document.createTextNode('🆕 Nueva versión: v'));
+        badge.appendChild(versionEl);
+        versionEl.textContent = v || '';
+      }
+    });
+  });
+}
+
+// Correr cuando el DOM esté listo (con retardo para no competir con el render inicial)
+if (document.readyState !== 'loading') {
+  setTimeout(initUpdateBadge, 1500);
+} else {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(initUpdateBadge, 1500));
+}

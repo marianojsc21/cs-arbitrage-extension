@@ -6,6 +6,12 @@ const GITHUB_RAW = 'https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-
 const GITHUB_MANIFEST = GITHUB_RAW + '/manifest.json';
 const FILES_TO_UPDATE = [
   'js/app.js',
+  'js/smart-invest.js',
+  'js/market-sniper.js',
+  'js/history-io.js',
+  'js/init.js',
+  'js/storage.js',
+  'js/loader.js',
   'js/content.js',
   'js/popup.js',
   'css/styles.css',
@@ -28,12 +34,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'getConfig') {
-    chrome.storage.local.get(['profitMin', 'enabled', 'lastVersion', 'updateAvailable'], (result) => {
+    chrome.storage.local.get(['profitMin', 'enabled', 'lastVersion', 'updateAvailable', 'remoteVersion'], (result) => {
       sendResponse({
         profitMin: result.profitMin || 10,
         enabled: result.enabled !== false,
         lastVersion: result.lastVersion || chrome.runtime.getManifest().version,
-        updateAvailable: result.updateAvailable || false
+        updateAvailable: result.updateAvailable || false,
+        remoteVersion: result.remoteVersion || null
       });
     });
     return true;
@@ -116,12 +123,29 @@ async function checkForUpdate() {
   }
 }
 
+/**
+ * Comparación semántica de versiones (major.minor.patch).
+ * Retorna true si `remote` es estrictamente más nueva que `local`.
+ *
+ * Maneja correctamente casos como 3.10.0 vs 3.9.0 (que fallarían
+ * con comparación de strings: "3.10.0" < "3.9.0" lexicográficamente).
+ * También tolera partes faltantes ("3.7" == "3.7.0") y no numéricas.
+ */
 function compareVersions(remote, local) {
-  const r = remote.split('.').map(Number);
-  const l = local.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((r[i] || 0) > (l[i] || 0)) return true;
-    if ((r[i] || 0) < (l[i] || 0)) return false;
+  const parse = (v) => String(v || '').trim().split('.').map(p => {
+    // Ignorar sufijos tipo "1-beta": solo interesa la parte numérica
+    const m = /^(\d+)/.exec(p);
+    const n = m ? parseInt(m[1], 10) : NaN;
+    return Number.isFinite(n) ? n : 0;
+  });
+  const r = parse(remote);
+  const l = parse(local);
+  const len = Math.max(r.length, l.length);
+  for (let i = 0; i < len; i++) {
+    const rv = r[i] || 0;
+    const lv = l[i] || 0;
+    if (rv > lv) return true;
+    if (rv < lv) return false;
   }
   return false;
 }

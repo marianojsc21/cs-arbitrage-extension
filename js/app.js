@@ -728,4 +728,7 @@
     initAppFromStorage();
   }
 
+  // Hook para History IO (export/import): recarga el historial desde storage
+  window.refreshSteamFarmHistory = loadHistory;
+
 })();

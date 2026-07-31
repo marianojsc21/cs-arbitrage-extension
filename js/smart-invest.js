@@ -1574,6 +1574,13 @@
     });
   }
 
+  // Hook para History IO (export/import): recarga el historial desde storage
+  window.refreshInvestHistory = () => {
+    if (!engine) return;
+    engine._loadHistory();
+    renderInvestHistory();
+  };
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initInvest);
   else initInvest();
 })();

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaintProfit — Arbitraje CS2 entre CSFloat y Steam Market</title>
+  <meta name="description" content="SaintProfit: extensión de navegador que encuentra oportunidades de arbitraje de precios en Counter-Strike 2 entre CSFloat y Steam Market.">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="site-nav" id="siteNav">
+    <div class="nav-inner">
+      <a href="#top" class="nav-brand">
+        <img src="assets/logo.png" alt="SaintProfit" class="nav-logo">
+        <span>SaintProfit</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Menú">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="#modos">Modos</a>
+        <a href="#instalacion">Instalación</a>
+        <a href="#guia">Guía de uso</a>
+        <a href="#faq">FAQ</a>
+        <a href="#descargar" class="nav-cta">Obtener</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero" id="top">
+    <div class="hero-glow"></div>
+    <div class="hero-inner">
+      <div class="hero-badge">🟠 Extensión para Brave & Chrome · Counter-Strike 2</div>
+      <img src="assets/logo.png" alt="SaintProfit logo" class="hero-logo">
+      <img src="assets/lettering.png" alt="SaintProfit lettering" class="hero-lettering">
+      <p class="hero-tagline">
+        Encontrá <strong>profit real</strong> entre <span class="t-cs">CSFloat</span> y
+        <span class="t-steam">Steam Market</span> en segundos. Skins, cuchillos, cajas, charms y más.
+      </p>
+      <div class="hero-actions">
+        <a href="#instalacion" class="btn btn-primary">🚀 Instalación rápida</a>
+        <a href="#modos" class="btn btn-ghost">Explorar los 3 modos ↓</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><strong>3</strong><span>Modos</span></div>
+        <div class="hero-stat"><strong>12</strong><span>Categorías</span></div>
+        <div class="hero-stat"><strong>27k+</strong><span>Items analizados</span></div>
+        <div class="hero-stat"><strong>0</strong><span>Costo</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== QUÉ ES ===================== -->
+  <section class="section" id="que-es">
+    <div class="container">
+      <h2 class="section-title">¿Qué hace SaintProfit?</h2>
+      <p class="section-sub">En palabras simples: busca dónde un item se vende <strong>barato</strong> en un mercado y <strong>caro</strong> en el otro, y te avisa.</p>
+      <div class="how-grid">
+        <div class="how-card">
+          <span class="how-icon">🔍</span>
+          <h3>1. Escaneá</h3>
+          <p>SaintProfit consulta los precios de CSFloat y Steam Market en tiempo real.</p>
+        </div>
+        <div class="how-card">
+          <span class="how-icon">🧮</span>
+          <h3>2. Calculá</h3>
+          <p>Descuenta las comisiones reales (15% Steam, 2% CSFloat) para mostrarte el profit neto, no el precio publicado.</p>
+        </div>
+        <div class="how-card">
+          <span class="how-icon">💰</span>
+          <h3>3. Ganá</h3>
+          <p>Comprás en el mercado barato, vendés en el caro, y te quedás con la diferencia en tu wallet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MODOS ===================== -->
+  <section class="section section-dark" id="modos">
+    <div class="container">
+      <h2 class="section-title">Los 3 modos</h2>
+      <p class="section-sub">Elegí el modo desde el popup de la extensión o haciendo clic en el título dentro de la app.</p>
+
+      <!-- ===== MODO 1: STEAMFARM ===== -->
+      <div class="mode-block" id="modo-steamfarm">
+        <div class="mode-text">
+          <span class="mode-chip chip-orange">💵 SteamFarm</span>
+          <h3>Comprá en CSFloat, vendé en Steam</h3>
+          <p>El modo clásico de arbitraje. Busca skins baratas en CSFloat que se venden más caras en Steam Market, calculando el profit real después de la comisión del 15%.</p>
+          <ul class="mode-points">
+            <li>✅ Profit $ y Profit % reales (neto de comisiones)</li>
+            <li>✅ Filtros: categoría, precio, profit mínimo, más vendidos</li>
+            <li>✅ Historial con Top 7 y restauración con un clic</li>
+            <li>✅ Links directos a CSFloat y Steam por cada item</li>
+          </ul>
+        </div>
+        <div class="mockup mockup-steamfarm">
+          <div class="mock-head">
+            <span>💵 SteamFarm</span>
+            <span class="mock-btn">🔍 Escanear</span>
+          </div>
+          <div class="mock-stats">
+            <div class="mock-stat"><strong>12</strong><span>Verificadas</span></div>
+            <div class="mock-stat"><strong>8</strong><span>Con Profit</span></div>
+            <div class="mock-stat"><strong>$3.42</strong><span>Promedio</span></div>
+            <div class="mock-stat"><strong>$14.1</strong><span>Mejor</span></div>
+          </div>
+          <div class="mock-table">
+            <div class="mock-th"><span>Item</span><span>CSFloat</span><span>Steam -15%</span><span>Profit</span></div>
+            <div class="mock-tr">
+              <span class="m-name">AK-47 | Redline FT</span>
+              <span>$15.00</span><span>$18.70</span>
+              <span class="m-profit">+$3.70 <small>24%</small></span>
+            </div>
+            <div class="mock-tr">
+              <span class="m-name">AWP | Asiimov BS</span>
+              <span>$28.00</span><span>$32.30</span>
+              <span class="m-profit">+$4.30 <small>15%</small></span>
+            </div>
+            <div class="mock-tr">
+              <span class="m-name">★ Gut Knife | Safari MW</span>
+              <span>$61.00</span><span>$69.50</span>
+              <span class="m-profit">+$8.50 <small>13%</small></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MODO 2: SMART INVEST ===== -->
+      <div class="mode-block mode-block-reverse" id="modo-invest">
+        <div class="mode-text">
+          <span class="mode-chip chip-violet">🧠 Smart Invest</span>
+          <h3>Optimizá tu saldo como un inversor</h3>
+          <p>Ingresá cuánto dinero tenés y el motor resuelve un problema de optimización (Knapsack): busca las mejores combinaciones de skins que usen la mayor parte de tu saldo posible.</p>
+          <ul class="mode-points">
+            <li>✅ 3 estrategias: 🟢 Conservadora · 🟡 Equilibrada · 🔴 Agresiva</li>
+            <li>✅ Investment Score con liquidez, riesgo y velocidad de venta</li>
+            <li>✅ Calculadora de capitalización compuesta</li>
+            <li>✅ Top Opportunities del día</li>
+          </ul>
+        </div>
+        <div class="mockup mockup-invest">
+          <div class="mock-head">
+            <span>🧠 Smart Invest</span>
+            <span class="mock-btn mock-btn-violet">🧠 Escanear</span>
+          </div>
+          <div class="mock-budget">
+            <label>💰 Presupuesto</label>
+            <div class="mock-budget-row"><strong>$37.52</strong><span>USD</span></div>
+          </div>
+          <div class="mock-strats">
+            <div class="mock-strat s-conservative"><span>🟢</span><div><strong>Conservadora</strong><small>$36.90 · ROI 5.2%</small></div></div>
+            <div class="mock-strat s-balanced active-strat"><span>🟡</span><div><strong>Equilibrada</strong><small>$37.40 · ROI 7.3%</small></div></div>
+            <div class="mock-strat s-aggressive"><span>🔴</span><div><strong>Agresiva</strong><small>$37.50 · ROI 8.0%</small></div></div>
+          </div>
+          <div class="mock-score-card">
+            <div class="mock-score-row">
+              <span>3 × AK-47 | Redline FT</span>
+              <span class="m-score-badge">Score 88</span>
+            </div>
+            <div class="mock-score-metrics">
+              <span>Profit +$2.81</span><span>ROD 2.7%/día</span><span>Liquidez ★★★★☆</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MODO 3: MARKET SNIPER ===== -->
+      <div class="mode-block" id="modo-sniper">
+        <div class="mode-text">
+          <span class="mode-chip chip-red">🎯 Market Sniper</span>
+          <h3>Cazá publicaciones mal valoradas</h3>
+          <p>Detecta listings donde el vendedor puso mal el precio: skins con charms caros que no valoró, stickers escondidos, o cuchillos/guantes publicados muy por debajo de su valor.</p>
+          <ul class="mode-points">
+            <li>✅ 🔪 Alerta roja automática: cuchillos/guantes &lt; $20 en Steam</li>
+            <li>✅ Valor real = skin + charms + stickers (calculado de verdad)</li>
+            <li>✅ Arbitraje de charms: charms que valen más que la skin</li>
+            <li>✅ Oportunidad Score + Confidence Score</li>
+          </ul>
+        </div>
+        <div class="mockup mockup-sniper">
+          <div class="mock-head">
+            <span>🎯 Market Sniper</span>
+            <div>
+              <span class="mock-btn mock-btn-blue">🟦 Escanear</span>
+              <span class="mock-btn mock-btn-cs">🟠 Escanear</span>
+            </div>
+          </div>
+          <div class="mock-alert">
+            <span class="mock-alert-title">🔪 ¡SNIPER!</span>
+            <span class="mock-alert-item">★ Gut Knife | Safari Mesh (WW)</span>
+            <span class="mock-alert-price">$18.50 <small>en Steam</small></span>
+            <span class="mock-alert-btn">🛒 COMPRA INMEDIATA</span>
+          </div>
+          <div class="mock-opp">
+            <div class="mock-opp-head"><span>🧩 USP-S + Charm</span><span class="m-score-badge">Score 96</span></div>
+            <div class="mock-opp-grid">
+              <span>Publicado <strong>$2.35</strong></span>
+              <span>Valor real <strong class="gold">$3.75</strong></span>
+              <span>Profit <strong class="green">+$1.40</strong></span>
+              <span>Confianza <strong>87%</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== INSTALACIÓN ===================== -->
+  <section class="section" id="instalacion">
+    <div class="container">
+      <h2 class="section-title">Instalación en 4 pasos</h2>
+      <p class="section-sub">Sin conocimientos técnicos. Solo seguí estos pasos.</p>
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <h3>Descargá el proyecto</h3>
+          <p>Abrí la página del proyecto en GitHub y hacé clic en <strong>Code → Download ZIP</strong>. Descomprimilo en tu escritorio.</p>
+          <a class="btn btn-small" href="https://github.com/marianojsc21/cs-arbitrage-extension" target="_blank" rel="noopener">Ir a GitHub ↗</a>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <h3>Abrí las extensiones</h3>
+          <p>En Brave escribí <code>brave://extensions</code> en la barra de direcciones. En Chrome: <code>chrome://extensions</code>.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <h3>Activá el modo desarrollador</h3>
+          <p>Activá el interruptor <strong>“Modo desarrollador”</strong> (arriba a la derecha).</p>
+        </div>
+        <div class="step">
+          <span class="step-num">4</span>
+          <h3>Cargá la extensión</h3>
+          <p>Clic en <strong>“Cargar descomprimida”</strong> y seleccioná la carpeta que descomprimiste. ¡Listo! 🎉</p>
+        </div>
+      </div>
+      <div class="note">
+        💡 <strong>Consejo:</strong> pineá la extensión en la barra (ícono de rompecabezas → 📌) para tenerla siempre a mano.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== GUÍA ===================== -->
+  <section class="section section-dark" id="guia">
+    <div class="container">
+      <h2 class="section-title">Guía de uso para todos</h2>
+      <p class="section-sub">Explicado sin tecnicismos.</p>
+
+      <div class="guide-grid">
+        <div class="guide-card">
+          <h3>💵 SteamFarm — el modo fácil</h3>
+          <ol>
+            <li><strong>Elegí el modo:</strong> abrí el popup de la extensión y tocá <em>SteamFarm</em>.</li>
+            <li><strong>Configurá los filtros:</strong> precio entre $3 y $50 y profit mínimo 10% suelen ser un buen punto de partida.</li>
+            <li><strong>Presioná “Escanear”:</strong> vas a ver el progreso en vivo con contador y timer.</li>
+            <li><strong>Revisá la tabla:</strong> el profit ya viene descontando la comisión del 15% de Steam.</li>
+            <li><strong>Comprá:</strong> tocá el icono de CSFloat para comprar, y el de Steam para ver a cuánto lo vendés.</li>
+          </ol>
+        </div>
+
+        <div class="guide-card">
+          <h3>🧠 Smart Invest — para crecer tu saldo</h3>
+          <ol>
+            <li><strong>Elegí el modo</strong> desde el popup.</li>
+            <li><strong>Poné tu saldo:</strong> por ejemplo <em>$37.52</em> en el campo Presupuesto.</li>
+            <li><strong>Escaneá:</strong> el motor busca skins en CSFloat y consulta Steam.</li>
+            <li><strong>Elegí estrategia:</strong> empezá con 🟡 <em>Equilibrada</em> (recomendada) y probá las otras.</li>
+            <li><strong>Invertí:</strong> la tarjeta ⭐ ÓPTIMA es la mejor combinación. Cada item abre su página en CSFloat con un clic.</li>
+          </ol>
+        </div>
+
+        <div class="guide-card">
+          <h3>🎯 Market Sniper — cazar oportunidades</h3>
+          <ol>
+            <li><strong>Elegí el modo</strong> desde el popup.</li>
+            <li><strong>Activá el escaneo de cuchillos:</strong> marcá “Cuchillos/Guantes &lt; $20” en los filtros.</li>
+            <li><strong>Escaneá:</strong> botón naranja = CSFloat · botón azul = Steam.</li>
+            <li><strong>Mirá el valor real:</strong> el breakdown muestra skin + charms + stickers por separado.</li>
+            <li><strong>La alerta roja:</strong> si aparece un cuchillo/guante barato, tapá <em>🛒 COMPRA INMEDIATA</em> para abrirlo en Steam.</li>
+          </ol>
+        </div>
+
+        <div class="guide-card guide-card-wide">
+          <h3>📚 Trucos y consejos</h3>
+          <ul>
+            <li>📋 <strong>Historial:</strong> cada escaneo se guarda solo. Tocá el 📋 para ver búsquedas viejas y restaurarlas con un clic.</li>
+            <li>⬇️ <strong>Exportar/Importar:</strong> desde cualquier historial podés respaldar tus búsquedas a un archivo JSON y llevarlas a otra PC.</li>
+            <li>🎨 <strong>Temas:</strong> en el footer podés cambiar entre SaintProfit, Night y Amber.</li>
+            <li>⏱️ <strong>Paciencia:</strong> CSFloat y Steam limitan la cantidad de consultas. Si ves error 429, esperá 1-2 minutos y reintentá.</li>
+            <li>🔄 <strong>Actualizaciones:</strong> la extensión chequea actualizaciones cada hora. Si ves “🆕 Nueva versión” en el footer, tocá para actualizar.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAQ ===================== -->
+  <section class="section" id="faq">
+    <div class="container">
+      <h2 class="section-title">Preguntas frecuentes</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>¿SaintProfit es gratis?</summary>
+          <p>Sí, 100% gratis y de código abierto. No hay versiones pagas ni cuentas premium.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Necesito una API key de CSFloat?</summary>
+          <p>No. SaintProfit usa los endpoints públicos de CSFloat y Steam Market directamente desde tu navegador.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿El profit que muestra es real?</summary>
+          <p>El profit ya viene neto de comisiones: se descuenta el 15% de Steam y el 2% de CSFloat. Los precios pueden variar entre que escaneás y comprás, así que tomalo como una estimación muy cercana.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Por qué me aparece “Error: CSFloat rate limit” o 429?</summary>
+          <p>CSFloat limita cuántas consultas podés hacer por minuto. Esperá 30-60 segundos, bajá el límite de listings en los filtros, y reintentá. La extensión ya espera entre lote y lote para evitarlo.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Puedo perder dinero con esto?</summary>
+          <p>Como en todo arbitraje, el precio de venta puede bajar antes de que vendas. Empezá con items con buen volumen (más vendidos) para minimizar el riesgo.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Funciona en Chrome además de Brave?</summary>
+          <p>Sí, funciona en Brave y Chrome (y cualquier navegador basado en Chromium, como Edge).</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CTA FINAL ===================== -->
+  <section class="section cta-section" id="descargar">
+    <div class="container">
+      <img src="assets/logo.png" alt="" class="cta-logo">
+      <h2>Empezá a encontrar profit hoy</h2>
+      <p>Instalá SaintProfit gratis y escaneá tu primera oportunidad en menos de 2 minutos.</p>
+      <div class="hero-actions">
+        <a href="#instalacion" class="btn btn-primary">⬆️ Ver instalación</a>
+        <a href="https://github.com/marianojsc21/cs-arbitrage-extension" class="btn btn-ghost" target="_blank" rel="noopener">⭐ Proyecto en GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="assets/logo.png" alt="" class="footer-logo">
+        <span>SaintProfit <span class="footer-ver">v3.7.2</span></span>
+      </div>
+      <div class="footer-links">
+        <a href="#modos">Modos</a>
+        <a href="#instalacion">Instalación</a>
+        <a href="#guia">Guía</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/marianojsc21/cs-arbitrage-extension" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer-note">© <span id="footerYear"></span> · Hecho con 🧡 para la comunidad CS2 · Datos de <a href="https://csfloat.com" target="_blank" rel="noopener">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank" rel="noopener">Steam Market</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

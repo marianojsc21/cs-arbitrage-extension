@@ -1226,6 +1226,45 @@
     .footer a:hover { color: var(--accent-3); }
     .footer-logo { width: 12px; height: 12px; vertical-align: middle; margin-right: 3px; border-radius: 3px; }
 
+    /* ===== UPDATE BADGE ===== */
+    .update-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 12px;
+      border: 1px solid var(--accent-1);
+      border-radius: 20px;
+      background: rgba(255,107,53,0.12);
+      color: var(--accent-1);
+      cursor: pointer;
+      font-size: 0.66rem;
+      font-weight: 700;
+      transition: all var(--transition);
+      vertical-align: middle;
+      animation: updateBadgePulse 2s ease-in-out infinite;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.2px;
+      user-select: none;
+    }
+
+    @keyframes updateBadgePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,53,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(255,107,53,0); }
+    }
+
+    .update-badge:hover {
+      background: rgba(255,107,53,0.22);
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+      transform: translateY(-1px);
+    }
+
+    .update-badge.updating {
+      opacity: 0.7;
+      pointer-events: none;
+      animation: none;
+    }
+
     /* ===== THEME TOGGLE ===== */
     .theme-toggle {
       display: inline-flex;
@@ -2529,6 +2568,8 @@
         <div class="history-header">
           <span class="history-title">📋 Historial de búsquedas</span>
           <div class="history-actions">
+            <button class="btn-icon history-export-btn" data-mode="profit" title="Exportar historial (JSON)">⬇️</button>
+            <button class="btn-icon history-import-btn" data-mode="profit" title="Importar historial (JSON)">⬆️</button>
             <button class="btn-icon" id="clearHistoryBtn" title="Borrar todo">🗑️</button>
             <button class="btn-icon" id="closeHistoryBtn" title="Cerrar">✕</button>
           </div>
@@ -2614,6 +2655,8 @@
         <div class="history-header">
           <span class="history-title">📋 Historial Smart Invest</span>
           <div class="history-actions">
+            <button class="btn-icon history-export-btn" data-mode="invest" title="Exportar historial (JSON)">⬇️</button>
+            <button class="btn-icon history-import-btn" data-mode="invest" title="Importar historial (JSON)">⬆️</button>
             <button class="btn-icon" id="clearInvHistoryBtn" title="Borrar todo">🗑️</button>
             <button class="btn-icon" id="closeInvHistoryBtn" title="Cerrar">✕</button>
           </div>
@@ -2734,6 +2777,8 @@
         <div class="history-header">
           <span class="history-title">📋 Historial Sniper</span>
           <div class="history-actions">
+            <button class="btn-icon history-export-btn" data-mode="sniper" title="Exportar historial (JSON)">⬇️</button>
+            <button class="btn-icon history-import-btn" data-mode="sniper" title="Importar historial (JSON)">⬆️</button>
             <button class="btn-icon" id="clearSnipHistoryBtn" title="Borrar todo">🗑️</button>
             <button class="btn-icon" id="closeSnipHistoryBtn" title="Cerrar">✕</button>
           </div>
@@ -2834,7 +2879,8 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer" style="position:relative">
-      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.7.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.7.2</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <span class="update-badge" id="updateBadge" style="display:none" title="Nueva versión disponible. Clic para actualizar.">🆕 Nueva versión: v<span id="updateBadgeVersion"></span></span>
       <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
         <span class="theme-dot saintprofit" id="themeDot"></span>
         <span id="themeLabel">Tema</span>
@@ -2932,7 +2978,10 @@
   <!-- Toast container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <input type="file" id="historyImportFile" accept=".json,application/json" style="display:none">
+
   <script src="js/storage.js"></script>
+  <script src="js/history-io.js"></script>
   <script src="js/app.js"></script>
   <script src="js/smart-invest.js"></script>
   <script src="js/market-sniper.js"></script>
