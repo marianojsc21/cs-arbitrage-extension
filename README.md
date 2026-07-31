@@ -4,7 +4,7 @@
 >
 > ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
 
-**SaintProfit** (v3.7.5) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+**SaintProfit** (v3.8.0) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
 Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
@@ -598,6 +598,11 @@ Si hay una versión más nueva, descarga los archivos actualizados y los almacen
 
 | Versión | Cambios |
 |---|---|
+| **v3.8.0** | 💾 **Caché de Steam persistente**: los precios de `SteamClient` se guardan en `chrome.storage.local` (máx. 3000 items, debounce 2s) y se cargan al abrir la extensión — los precios sobreviven a recargas sin re-consultar a Steam |
+| **v3.7.9** | 🧹 **Limpieza de fallbacks muertos de Steam**: eliminadas las cachés locales duplicadas (`steamCache` en app.js y smart-invest.js, `priceCache` en market-sniper.js) y sus fetches directos a priceoverview — los 3 modos usan exclusivamente `SteamClient` (caché compartida + cola global + backoff) |
+| **v3.7.8** | 🗂️ **Auto-apertura de csfloat.com**: si al escanear no hay ninguna pestaña de csfloat.com abierta, la extensión la abre automáticamente en segundo plano (active:false), avisa en la UI y espera a que el content script esté listo — adiós al 403 de sesión manual |
+| **v3.7.7** | 🗄️ **Indicador de estado de la caché de CSFloat** en la UI: muestra hace cuánto se descargó el price-list ("Precios de hace X min — escaneá de nuevo para refrescar") + botón 🔄 para forzar el refresh manual |
+| **v3.7.6** | 🛡️ **Cliente centralizado de Steam** (`js/steam.js`): caché compartida de priceoverview (30 min) entre los 3 modos + cola global anti-ráfaga (1 request / 1s) + retry backoff en 429 + variantes de stickers — los modos ya no re-consultan los mismos items entre sí ni disparan ráfagas que Steam corta con 429 |
 | **v3.7.5** | 🔓 Fix Market Sniper "Listings 0/0": la API de listings de CSFloat ahora exige sesión logueada (403). El escaneo ahora usa el **content script en csfloat.com** como puente de sesión (fetch same-origin con tus cookies) y cae al fetch directo si no hay pestaña abierta — con mensaje claro en pantalla en vez de un 0/0 silencioso |
 | **v3.7.4** | 🚦 Nuevo **cliente centralizado de CSFloat** (`js/csfloat.js`): usa la API key del usuario (`Authorization: Bearer`) + caché compartida del price-list (30 min) + cola global anti-bloqueo (1 request / 1.1s) con retry backoff en 429 — los 3 modos dejan de disparar ráfagas que provocan "too many requests from too many IPs" |
 | **v3.7.3** | 🎯 Market Sniper: Fase 2 del escaneo Steam reescrita como **Charm Arbitrage** — busca skins con charms/stickers equipados y detecta dónde conviene comprar skin+charm baratos para venderlos **por separado en Steam** (badge ⭐ cuando el charm vale más que la skin) · Sin búsquedas vacías de 1 segundo |

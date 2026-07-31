@@ -229,6 +229,13 @@
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Ping: usado por CSFloatClient.ensureSessionTab para detectar que el
+    // content script ya está inyectado en una pestaña (recién abierta o no).
+    if (request.action === 'ping') {
+      sendResponse({ ok: true });
+      return;
+    }
+
     // Puente de API: ejecuta fetch same-origin desde csfloat.com.
     // La API de listings exige sesión logueada (cookie del navegador),
     // y este fetch corre dentro de la página con la sesión activa.

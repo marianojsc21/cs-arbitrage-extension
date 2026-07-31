@@ -6,7 +6,6 @@
 
   let allResults = [];
   let scanHistory = [];
-  let steamCache = {};
   let scanning = false;
   let historyOpen = false;
 
@@ -101,46 +100,15 @@
     return await resp.json();
   }
 
-  // ===== STEAM API =====
+  // ===== STEAM API (centralizado: caché compartida + cola global + backoff) =====
   // Returns { price, volume } or null
+  // Solo usa SteamClient (js/steam.js, cargado antes que app.js): caché
+  // compartida + cola global + backoff 429. Ya no hay fallback local.
   async function fetchSteamPrice(name) {
-    if (steamCache[name] && Date.now() - steamCache[name].time < 1800000) {
-      return steamCache[name];
+    if (window.SteamClient && typeof window.SteamClient.getPrice === 'function') {
+      return await window.SteamClient.getPrice(name);
     }
-    try {
-      const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=${encodeURIComponent(name)}`;
-      const resp = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://steamcommunity.com/market/',
-          'Origin': 'https://steamcommunity.com',
-        }
-      });
-      if (resp.status === 429) {
-        await new Promise(r => setTimeout(r, 5000));
-        return null;
-      }
-      const data = await resp.json();
-      if (!data.success) return null;
-      // Solo usamos lowest_price (precio mínimo actual).
-      // NO usamos median_price porque para items de bajo volumen
-      // la mediana histórica puede diferir mucho del precio real.
-      if (!data.lowest_price) return null;
-      let price = parseFloat(data.lowest_price.replace('$', '').replace(',', ''));
-      let volume = 0;
-      if (data.volume) {
-        volume = parseInt(data.volume.replace(/,/g, ''), 10) || 0;
-      }
-      if (price) {
-        const result = { price, volume, time: Date.now() };
-        steamCache[name] = result;
-        return result;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   // ===== MIGRACIÓN DESDE CSMuza (v1.x) =====
@@ -525,6 +493,7 @@
     scanBtn.textContent = '🔍 Escanear';
     scanBtn.classList.remove('scanning');
     scanning = false;
+    if (typeof updateCacheIndicator === 'function') updateCacheIndicator();
   }
 
   // ===== RENDER =====
@@ -734,5 +703,55 @@
 
   // Hook para History IO (export/import): recarga el historial desde storage
   window.refreshSteamFarmHistory = loadHistory;
+
+  // ===== CACHE INDICATOR (estado de la caché de CSFloat) =====
+  function updateCacheIndicator() {
+    const el = document.getElementById('cacheIndicator');
+    const txt = document.getElementById('cacheText');
+    if (!el || !txt) return;
+    let info = null;
+    try {
+      if (window.CSFloatClient && typeof window.CSFloatClient.getCacheInfo === 'function') {
+        info = window.CSFloatClient.getCacheInfo();
+      }
+    } catch (e) {}
+    if (!info || !info.cached) {
+      txt.textContent = 'Sin datos de CSFloat aún — escaneá para descargar precios';
+      el.classList.remove('cache-fresh', 'cache-stale');
+      return;
+    }
+    const ageMin = Math.max(0, Math.floor(info.ageMs / 60000));
+    const ttlMin = Math.max(1, Math.round(info.ttlMs / 60000));
+    txt.textContent = ageMin < 1
+      ? 'Precios recién descargados — escaneá para usarlos'
+      : `Precios de hace ${ageMin} min — escaneá de nuevo para refrescar`;
+    el.classList.toggle('cache-fresh', ageMin <= ttlMin / 2);
+    el.classList.toggle('cache-stale', ageMin > ttlMin / 2);
+  }
+
+  // Botón de refresco manual (force = uso puntual, NO en cada escaneo)
+  const cacheRefreshBtn = document.getElementById('cacheRefreshBtn');
+  if (cacheRefreshBtn) {
+    cacheRefreshBtn.addEventListener('click', async () => {
+      cacheRefreshBtn.disabled = true;
+      cacheRefreshBtn.textContent = '⏳';
+      try {
+        if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
+          await window.CSFloatClient.getPriceList(true);
+          showToast('🗄️ Price-list de CSFloat actualizado', 'success');
+        }
+      } catch (e) {
+        showToast(`❌ Error al refrescar: ${e.message}`, 'error');
+      } finally {
+        cacheRefreshBtn.disabled = false;
+        cacheRefreshBtn.textContent = '🔄';
+        updateCacheIndicator();
+      }
+    });
+  }
+
+  updateCacheIndicator();
+  setInterval(updateCacheIndicator, 30000); // mantiene el "hace X min" al día
+  window.updateCacheIndicator = updateCacheIndicator;
 
 })();

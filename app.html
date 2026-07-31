@@ -1675,6 +1675,51 @@
       margin-bottom: 4px;
     }
 
+    /* ===== CACHE INDICATOR (estado de la caché de CSFloat) ===== */
+    .cache-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .cache-indicator .cache-icon { flex-shrink: 0; font-size: 0.8rem; }
+    .cache-indicator .cache-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cache-indicator.cache-fresh {
+      border-color: rgba(0,212,170,0.35);
+      background: rgba(0,212,170,0.06);
+    }
+    .cache-indicator.cache-stale {
+      border-color: rgba(255,107,53,0.4);
+      background: rgba(255,107,53,0.08);
+    }
+    .cache-refresh {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.3);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 2px 7px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      transition: color var(--transition), border-color var(--transition), opacity var(--transition);
+    }
+    .cache-refresh:hover { color: var(--accent-1); border-color: var(--accent-1); }
+    .cache-refresh:disabled { opacity: 0.5; cursor: wait; }
+
 
 
     /* ===== STEAM SNIPER OVERLAY (RED ALERT) ===== */
@@ -2367,6 +2412,11 @@
 
     <!-- ===== COLUMN 1: FILTERS ===== -->
     <div class="filters-col">
+      <div class="cache-indicator" id="cacheIndicator" title="Estado de la caché de precios de CSFloat (price-list)">
+        <span class="cache-icon">🗄️</span>
+        <span class="cache-text" id="cacheText">Sin datos de CSFloat aún</span>
+        <button class="cache-refresh" id="cacheRefreshBtn" title="Forzar descarga del price-list de CSFloat ahora">🔄</button>
+      </div>
       <div class="filter-card" data-mode="profit">
         <div class="filter-card-header">💵 SteamFarm</div>
         <div class="filter-card-body">
@@ -2879,7 +2929,7 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer" style="position:relative">
-      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.7.5</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.8.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
       <span class="update-badge" id="updateBadge" style="display:none" title="Nueva versión disponible. Clic para actualizar.">🆕 Nueva versión: v<span id="updateBadgeVersion"></span></span>
       <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
         <span class="theme-dot saintprofit" id="themeDot"></span>
@@ -2982,6 +3032,7 @@
 
   <script src="js/storage.js"></script>
   <script src="js/csfloat.js"></script>
+  <script src="js/steam.js"></script>
   <script src="js/history-io.js"></script>
   <script src="js/app.js"></script>
   <script src="js/smart-invest.js"></script>

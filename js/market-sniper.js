@@ -23,11 +23,8 @@
   // ======================================================================
   // CONSTANTS
   // ======================================================================
-  const CACHE_TTL = 30 * 60 * 1000; // 30 min
-  const STEAM_API = 'https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=';
   const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
   const CSFLOAT_PRICE_API = 'https://csfloat.com/api/v1/listings/price-list';
-  const STICKER_QUALITIES = ['', ' (Holo)', ' (Foil)', ' (Gold)', ' (Glitter)', ' (Crystal)'];
   const POLL_INTERVAL_MS = 45000; // 45s between real-time polls
 
   // ======================================================================
@@ -35,51 +32,15 @@
   // ======================================================================
 
   /** Shared Steam price fetcher with sticker quality fallback */
-  async function _fetchSteamPrice(name, cache) {
+  async function _fetchSteamPrice(name) {
     if (!name) return null;
-    const cached = cache[name];
-    if (cached && Date.now() - cached.time < CACHE_TTL) return cached;
-    try {
-      const url = STEAM_API + encodeURIComponent(name);
-      const resp = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0',
-          'Referer': 'https://steamcommunity.com/market/',
-          'Origin': 'https://steamcommunity.com',
-        }
-      });
-      if (resp.status === 429) { await new Promise(r => setTimeout(r, 5000)); return null; }
-      const data = await resp.json();
-      if (!data.success || !data.lowest_price) {
-        if (name.includes('Sticker |') && !name.includes('(')) {
-          for (const q of [' (Holo)', ' (Foil)', ' (Gold)', ' (Glitter)', ' (Crystal)']) {
-            const altName = name + q;
-            const altResp = await fetch(STEAM_API + encodeURIComponent(altName), {
-              headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://steamcommunity.com/market/', 'Origin': 'https://steamcommunity.com' }
-            });
-            if (altResp.status === 429) break;
-            const altData = await altResp.json();
-            if (altData.success && altData.lowest_price) {
-              data.lowest_price = altData.lowest_price;
-              data.volume = altData.volume || '0';
-              data.success = true;
-              break;
-            }
-          }
-        }
-        if (!data.success) return null;
-      }
-      const price = parseFloat(data.lowest_price.replace('$', '').replace(',', ''));
-      let volume = 0;
-      if (data.volume) volume = parseInt(data.volume.replace(/,/g, ''), 10) || 0;
-      if (price && price > 0) {
-        const result = { price, volume, time: Date.now() };
-        cache[name] = result;
-        return result;
-      }
-      return null;
-    } catch (e) { return null; }
+    // Centralizado: caché compartida + cola global + backoff + variantes de stickers.
+    // Solo usa SteamClient (js/steam.js, cargado antes que market-sniper.js):
+    // ya no hay caché ni fallback local.
+    if (window.SteamClient && typeof window.SteamClient.getPrice === 'function') {
+      return await window.SteamClient.getPrice(name, { variants: true });
+    }
+    return null;
   }
 
   function _calcLiquidity(volume) {
@@ -127,7 +88,6 @@
    *   - listingUrl(id) — URL to view the listing
    */
   class MarketProvider {
-    constructor() { this.priceCache = {}; }
     get fees() { return { buy: 0, sell: 0 }; }
     async fetchListings() { throw new Error('Not implemented'); }
     async fetchPrice(name) { throw new Error('Not implemented'); }
@@ -144,7 +104,7 @@
     get icon() { return '🟦'; }
 
     async fetchPrice(name) {
-      return _fetchSteamPrice(name, this.priceCache);
+      return _fetchSteamPrice(name);
     }
 
     /** Steam doesn't have a public "recent listings" API like CSFloat.
@@ -707,6 +667,7 @@
         throw e;
       } finally {
         this.scanning = false;
+        if (typeof window.updateCacheIndicator === 'function') window.updateCacheIndicator();
       }
     }
 
@@ -1304,6 +1265,14 @@
     if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">🟠</span><h3>Escaneando CSFloat...</h3><p>Obteniendo listings de CSFloat Market</p></div>';
 
     try {
+      // Asegurar la sesión de csfloat.com ANTES de escanear: si no hay
+      // pestaña abierta, se abre automáticamente en segundo plano y espera
+      // a que el content script responda (hasta 20s).
+      if (ctx.statusEl) ctx.statusEl.textContent = '🗂️ Verificando pestaña de csfloat.com (sesión para listings)...';
+      if (window.CSFloatClient && typeof window.CSFloatClient.ensureSessionTab === 'function') {
+        try { await window.CSFloatClient.ensureSessionTab(); } catch (e) {}
+      }
+
       // Run CSFloat scan (the main cross-market analysis)
       await engine.runFullScan(ctx.options);
       _scanComplete(ctx);
@@ -1324,6 +1293,14 @@
     if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">🟦</span><h3>Escaneando Steam Market...</h3><p>Buscando oportunidades en Steam</p></div>';
 
     try {
+      // Proactivo: asegurar la pestaña de csfloat.com para la Fase 2 (charm
+      // arbitrage). Si no hay ninguna, se abre sola en segundo plano SIN
+      // bloquear la Fase 1 (que solo usa Steam). Para cuando llegue la Fase
+      // 2, la pestaña ya estará cargada.
+      if (window.CSFloatClient && typeof window.CSFloatClient.ensureSessionTab === 'function') {
+        window.CSFloatClient.ensureSessionTab().catch(() => {});
+      }
+
       // ==================================================================
       // FASE 1: Cuchillos y guantes baratos en Steam (< $20)
       // ==================================================================
@@ -1423,8 +1400,8 @@
       if (ctx.statusEl && charmListings.length === 0) {
         // Mostrar el error real (ej: 403 = falta sesión) en vez de un 0/0 silencioso
         if (charmError && charmError.includes('403')) {
-          ctx.statusEl.textContent = '❌ La API de listings exige sesión: abrí csfloat.com (logueado) en una pestaña y reintentá.';
-          showToast('❌ Abrí csfloat.com en una pestaña para escanear charms', 'error');
+          ctx.statusEl.textContent = '❌ csfloat.com exige sesión: logueate en la pestaña que se abrió y reintentá.';
+          showToast('❌ Logueate en csfloat.com (la pestaña ya se abrió) para escanear charms', 'error');
         } else if (charmError) {
           ctx.statusEl.textContent = `❌ No se obtuvieron listings: ${charmError}`;
         } else {
@@ -1718,6 +1695,23 @@
   });
 
   // Expose for init.js
+  // Aviso de sesión: cuando no hay csfloat.com abierto, CSFloatClient lo
+  // abre solo en segundo plano y emite eventos. Acá reflejamos el aviso en
+  // la UI (status + toast) para que el usuario sepa qué está pasando.
+  window.addEventListener('csfloat-session-opening', () => {
+    const statusEl = $('snipStatus');
+    if (statusEl && statusEl.textContent) {
+      statusEl.textContent = '🗂️ No había csfloat.com abierto — abriéndolo en segundo plano...';
+    }
+    showToast('🗂️ Abriendo csfloat.com en segundo plano (sesión para listings)...', 'info');
+  });
+  window.addEventListener('csfloat-session-ready', () => {
+    const statusEl = $('snipStatus');
+    if (statusEl && statusEl.textContent && statusEl.textContent.includes('Abriendo csfloat.com')) {
+      statusEl.textContent = '✅ csfloat.com listo — continuando...';
+    }
+  });
+
   window.initOpportunityEngine = initOpportunityEngine;
   window.renderOpportunityResults = renderResults;
   window.renderOpportunityHistory = renderHistory;

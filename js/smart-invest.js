@@ -15,8 +15,6 @@
   'use strict';
 
   const CSFLOAT_API = 'https://csfloat.com/api/v1/listings/price-list';
-  const STEAM_API = 'https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=';
-  const CACHE_TTL = 30 * 60 * 1000;
   const KNAPSACK_TIME_LIMIT_MS = 2000;
   const MAX_COMBINATIONS = 100000;
 
@@ -42,7 +40,6 @@
       this.combinations = [];
       this.strategy = 'balanced'; // 'conservative' | 'balanced' | 'aggressive'
       this.strategyResults = { conservative: [], balanced: [], aggressive: [] };
-      this.steamCache = {};
       this.history = [];
       this.scanning = false;
       this.fees = { ...DEFAULT_FEES };
@@ -289,34 +286,13 @@
     // ======================================================================
 
     async _fetchSteamPrice(name) {
-      const cached = this.steamCache[name];
-      if (cached && Date.now() - cached.time < CACHE_TTL) return cached;
-
-      try {
-        const url = STEAM_API + encodeURIComponent(name);
-        const resp = await fetch(url, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://steamcommunity.com/market/',
-            'Origin': 'https://steamcommunity.com',
-          }
-        });
-        if (resp.status === 429) { await new Promise(r => setTimeout(r, 5000)); return null; }
-        const data = await resp.json();
-        if (!data.success || !data.lowest_price) return null;
-        const price = parseFloat(data.lowest_price.replace('$', '').replace(',', ''));
-        let volume = 0;
-        if (data.volume) volume = parseInt(data.volume.replace(/,/g, ''), 10) || 0;
-        if (price && price > 0) {
-          const result = { price, volume, time: Date.now() };
-          this.steamCache[name] = result;
-          return result;
-        }
-        return null;
-      } catch (e) {
-        return null;
+      // Centralizado: caché compartida + cola global + backoff 429.
+      // Solo usa SteamClient (js/steam.js, cargado antes que smart-invest.js):
+      // ya no hay caché ni fallback local.
+      if (window.SteamClient && typeof window.SteamClient.getPrice === 'function') {
+        return await window.SteamClient.getPrice(name);
       }
+      return null;
     }
 
     // ======================================================================
@@ -1052,6 +1028,7 @@
         throw e;
       } finally {
         this.scanning = false;
+        if (typeof window.updateCacheIndicator === 'function') window.updateCacheIndicator();
       }
     }
 

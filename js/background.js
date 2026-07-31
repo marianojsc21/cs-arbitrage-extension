@@ -12,6 +12,7 @@ const FILES_TO_UPDATE = [
   'js/init.js',
   'js/storage.js',
   'js/csfloat.js',
+  'js/steam.js',
   'js/loader.js',
   'js/content.js',
   'js/popup.js',

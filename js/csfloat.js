@@ -123,24 +123,114 @@
     });
   }
 
+  // ---- Sesión de csfloat.com (puente por content script) ----
+  let sessionTabId = null;   // pestaña que abrimos/cacheamos para la sesión
+  let sessionTabPromise = null; // dedup: evita abrir 2 pestañas si hay llamadas concurrentes
+
+  /** Emite un evento de aviso a la UI (la pestaña se va a abrir) */
+  function emitAutoOpenNotice(kind) {
+    try {
+      window.dispatchEvent(new CustomEvent('csfloat-session-' + kind));
+    } catch (e) { /* sin UI disponible */ }
+  }
+
+  /**
+   * Asegura que exista una pestaña de csfloat.com con el content script
+   * listo para el puente de sesión. Si no hay ninguna abierta, la abre en
+   * segundo plano (active:false) y espera a que el content script responda
+   * al ping. Devuelve el tabId o null si no se pudo.
+   *
+   *  - Evita el 403 "you need to be logged in" abriendo csfloat.com solo.
+   *  - Abre con active:false para no robar el foco al usuario.
+   *  - Cachea el tabId para reutilizarlo en llamadas siguientes.
+   *  - Dedup: llamadas concurrentes comparten la misma operación en curso
+   *    (evita abrir 2 pestañas si dos scans piden la sesión a la vez).
+   */
+  async function ensureSessionTab() {
+    if (sessionTabPromise) return sessionTabPromise;
+    sessionTabPromise = doEnsureSessionTab();
+    try {
+      return await sessionTabPromise;
+    } finally {
+      sessionTabPromise = null;
+    }
+  }
+
+  async function doEnsureSessionTab() {
+    try {
+      // 1) Reutilizar la pestaña que ya validamos
+      if (sessionTabId) {
+        try {
+          const t = await chrome.tabs.get(sessionTabId);
+          if (t && t.id) {
+            // Verificar que el content script sigue respondiendo
+            try {
+              await chrome.tabs.sendMessage(sessionTabId, { action: 'ping' });
+              return sessionTabId;
+            } catch (e) { /* content script caído → seguir a reutilizar otra */ }
+          }
+        } catch (e) { /* pestaña cerrada */ }
+        sessionTabId = null;
+      }
+
+      // 2) Buscar una pestaña de csfloat.com ya abierta por el usuario.
+      //    Solo sirve si su content script responde al ping (si no, pudo
+      //    cargarse antes de recargar la extensión o estar descartada).
+      const tabs = await chrome.tabs.query({ url: 'https://csfloat.com/*' });
+      for (const t of tabs || []) {
+        try {
+          await chrome.tabs.sendMessage(t.id, { action: 'ping' });
+          sessionTabId = t.id;
+          return sessionTabId;
+        } catch (e) { /* tab sin content script → probar la siguiente */ }
+      }
+
+      // 3) No hay ninguna: avisar a la UI y abrir en segundo plano
+      emitAutoOpenNotice('opening');
+      const tab = await chrome.tabs.create({ url: 'https://csfloat.com/search', active: false });
+      if (!tab || !tab.id) return null;
+      sessionTabId = tab.id;
+
+      // 4) Esperar a que cargue y el content script responda al ping
+      const deadline = Date.now() + 20000; // hasta 20s
+      while (Date.now() < deadline) {
+        try {
+          const res = await chrome.tabs.sendMessage(sessionTabId, { action: 'ping' });
+          if (res && res.ok) {
+            emitAutoOpenNotice('ready');
+            return sessionTabId;
+          }
+        } catch (e) { /* todavía cargando */ }
+        await sleep(500);
+      }
+      // Si no respondió en 20s, devolvemos el tab igual; el caller reintentará
+      return sessionTabId;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /**
    * Puente por sesión: ejecuta el fetch DENTRO de una pestaña de csfloat.com
    * vía el content script. La API de listings exige estar logueado (cookie de
    * sesión del navegador) y devuelve 403 si no. Este puente usa la sesión que
-   * ya está abierta en la pestaña. Si no hay pestaña de csfloat.com, devuelve
-   * null y el caller cae al fetch directo (que puede dar 403).
+   * ya está abierta en la pestaña. Si no hay pestaña de csfloat.com, la abre
+   * automáticamente en segundo plano (ensureSessionTab). Si aún así no se
+   * puede, devuelve null y el caller cae al fetch directo (que puede dar 403).
    */
   async function fetchViaSession(url) {
     try {
-      const tabs = await chrome.tabs.query({ url: 'https://csfloat.com/*' });
-      if (!tabs || !tabs.length) return null;
-      for (const tab of tabs.slice(0, 3)) {
+      const tabId = await ensureSessionTab();
+      if (!tabId) return null;
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const res = await chrome.tabs.sendMessage(tab.id, { action: 'csfloatFetch', url });
+          const res = await chrome.tabs.sendMessage(tabId, { action: 'csfloatFetch', url });
           if (res && res.ok && res.body) {
             return JSON.parse(res.body);
           }
-        } catch (e) { /* tab sin content script o contexto invalidado */ }
+          if (res && res.error) return null;
+        } catch (e) { /* content script todavía no listo */ }
+        await sleep(700);
       }
     } catch (e) {}
     return null;
@@ -184,5 +274,16 @@
     return listings;
   }
 
-  window.CSFloatClient = { getPriceList, fetchListings, fetchViaSession };
+  /** Información de la caché del price-list para la UI.
+   *  Devuelve { cached, ageMs, ttlMs } — usado por el indicador
+   *  "Precios de hace X min" en la página. */
+  function getCacheInfo() {
+    return {
+      cached: !!(priceListCache && priceListTime > 0),
+      ageMs: priceListTime > 0 ? Date.now() - priceListTime : 0,
+      ttlMs: PRICE_LIST_TTL,
+    };
+  }
+
+  window.CSFloatClient = { getPriceList, fetchListings, fetchViaSession, getCacheInfo, ensureSessionTab };
 })();
