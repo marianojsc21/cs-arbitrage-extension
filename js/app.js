@@ -90,14 +90,14 @@
   }
 
   // ===== CSFLOAT API (centralizado: key + caché + cola) =====
+  // Solo usa CSFloatClient (js/csfloat.js, cargado antes que app.js):
+  // API key + caché compartida 15 min + cola anti-bloqueo. Ya no hay
+  // fallback directo (reintroducía rate limits y duplicaba consultas).
   async function fetchCSFloatPriceList() {
     if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
       return await window.CSFloatClient.getPriceList();
     }
-    // Fallback si el cliente no está cargado
-    const resp = await fetch('https://csfloat.com/api/v1/listings/price-list');
-    if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
-    return await resp.json();
+    throw new Error('CSFloatClient no disponible');
   }
 
   // ===== STEAM API (centralizado: caché compartida + cola global + backoff) =====

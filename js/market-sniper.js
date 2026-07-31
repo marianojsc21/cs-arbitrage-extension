@@ -23,8 +23,9 @@
   // ======================================================================
   // CONSTANTS
   // ======================================================================
-  const CSFLOAT_LISTINGS_API = 'https://csfloat.com/api/v1/listings';
-  const CSFLOAT_PRICE_API = 'https://csfloat.com/api/v1/listings/price-list';
+  // Nota: los endpoints de CSFloat (listings y price-list) se acceden SOLO
+  // vía window.CSFloatClient (js/csfloat.js): API key + caché compartida +
+  // cola anti-bloqueo + puente de sesión. Ya no hay fallback directo.
   const POLL_INTERVAL_MS = 45000; // 45s between real-time polls
 
   // ======================================================================
@@ -134,41 +135,12 @@
     async fetchListings(options = {}) {
       const { maxListings = 100 } = options;
       // Delegado al cliente centralizado (API key + cola global anti-bloqueo).
-      // El cliente maneja paginación, backoff 429 y caché compartida.
+      // El cliente maneja paginación, backoff 429, caché compartida y el
+      // puente de sesión para listings (que exige estar logueado en csfloat.com).
       if (window.CSFloatClient && typeof window.CSFloatClient.fetchListings === 'function') {
         return await window.CSFloatClient.fetchListings(maxListings);
       }
-      // Fallback directo si el cliente no está cargado
-      const listings = [];
-      let cursor = null;
-      let fetched = 0;
-      const BATCH_SIZE = 10;
-
-      while (fetched < maxListings) {
-        let url = `${CSFLOAT_LISTINGS_API}?limit=${BATCH_SIZE}&types=buy_now`;
-        if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
-        const resp = await fetch(url);
-        if (resp.status === 429) {
-          if (cursor || fetched > 0) break;
-          await new Promise(r => setTimeout(r, 12000));
-          continue;
-        }
-        if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
-        const data = await resp.json();
-        const batch = data.data || data || [];
-        if (!batch.length) break;
-        for (const l of batch) {
-          if (l.type && l.type !== 'purchase') continue;
-          if (l.state && l.state !== 'published') continue;
-          listings.push(l);
-          fetched++;
-          if (fetched >= maxListings) break;
-        }
-        cursor = data.cursor || data.next_cursor || null;
-        if (!cursor && batch.length < BATCH_SIZE) break;
-        await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
-      }
-      return listings;
+      throw new Error('CSFloatClient no disponible');
     }
 
     listingUrl(id) {
@@ -269,14 +241,10 @@
       let csfloatPrice = null;
       try {
         // CSFloat price-list is an array, not per-item lookup
-        // Centralizado: key + caché 30 min + cola (evita rate limits)
+        // Centralizado: key + caché + cola (evita rate limits).
+        // Solo usa CSFloatClient (js/csfloat.js) — ya no hay fallback directo.
         if (!this._csfloatPriceList) {
-          if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
-            this._csfloatPriceList = await window.CSFloatClient.getPriceList();
-          } else {
-            const resp = await fetch(CSFLOAT_PRICE_API);
-            if (resp.ok) this._csfloatPriceList = await resp.json();
-          }
+          this._csfloatPriceList = await window.CSFloatClient.getPriceList();
         }
         if (this._csfloatPriceList) {
           const found = this._csfloatPriceList.find(p =>

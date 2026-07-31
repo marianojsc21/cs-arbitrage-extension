@@ -4,7 +4,7 @@
 >
 > ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
 
-**SaintProfit** (v3.8.0) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+**SaintProfit** (v3.8.2) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
 Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
@@ -598,6 +598,8 @@ Si hay una versión más nueva, descarga los archivos actualizados y los almacen
 
 | Versión | Cambios |
 |---|---|
+| **v3.8.2** | 💾 **Caché de CSFloat persistente**: el price-list (~27k items) se guarda en `chrome.storage.local` (con `unlimitedStorage` para la cuota) y se carga al abrir la extensión — los precios sobreviven a recargas sin re-descargar |
+| **v3.8.1** | 🧹 **Limpieza de fallbacks muertos de CSFloat**: eliminados los fetches directos a `price-list`/`listings` de app.js, smart-invest.js y market-sniper.js (y sus constantes `CSFLOAT_API`/`CSFLOAT_LISTINGS_API`/`CSFLOAT_PRICE_API`) — los 3 modos usan exclusivamente `CSFloatClient` (key + caché + cola + puente de sesión) |
 | **v3.8.0** | 💾 **Caché de Steam persistente**: los precios de `SteamClient` se guardan en `chrome.storage.local` (máx. 3000 items, debounce 2s) y se cargan al abrir la extensión — los precios sobreviven a recargas sin re-consultar a Steam |
 | **v3.7.9** | 🧹 **Limpieza de fallbacks muertos de Steam**: eliminadas las cachés locales duplicadas (`steamCache` en app.js y smart-invest.js, `priceCache` en market-sniper.js) y sus fetches directos a priceoverview — los 3 modos usan exclusivamente `SteamClient` (caché compartida + cola global + backoff) |
 | **v3.7.8** | 🗂️ **Auto-apertura de csfloat.com**: si al escanear no hay ninguna pestaña de csfloat.com abierta, la extensión la abre automáticamente en segundo plano (active:false), avisa en la UI y espera a que el content script esté listo — adiós al 403 de sesión manual |

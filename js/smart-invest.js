@@ -14,7 +14,6 @@
 (function() {
   'use strict';
 
-  const CSFLOAT_API = 'https://csfloat.com/api/v1/listings/price-list';
   const KNAPSACK_TIME_LIMIT_MS = 2000;
   const MAX_COMBINATIONS = 100000;
 
@@ -159,15 +158,10 @@
       this._emitProgress(0, 1, '📡 Obteniendo lista de precios de CSFloat...', 'csfloat');
 
       try {
-        let priceList;
-        if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
-          // Centralizado: API key + caché compartida 30 min + cola anti-bloqueo
-          priceList = await window.CSFloatClient.getPriceList();
-        } else {
-          const resp = await fetch(CSFLOAT_API);
-          if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
-          priceList = await resp.json();
-        }
+        // Centralizado: API key + caché compartida + cola anti-bloqueo.
+        // Solo usa CSFloatClient (js/csfloat.js, cargado antes que
+        // smart-invest.js) — ya no hay fallback directo.
+        const priceList = await window.CSFloatClient.getPriceList();
         this.rawPriceList = priceList;
 
         this._emitProgress(0, 1, `📦 ${priceList.length} items obtenidos. Aplicando filtros...`, 'filter');

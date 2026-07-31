@@ -35,6 +35,71 @@
   let priceListCache = null;
   let priceListTime = 0;
 
+  // ---- Persistencia (chrome.storage.local) ----
+  const STORAGE_KEY = 'saintprofit_csfloat_pricelist';
+  const SAVE_DEBOUNCE_MS = 2000;       // guarda como máximo 1 vez cada 2s
+  let readyPromise = null;              // promise única de carga de la caché persistida
+  let saveTimer = null;
+
+  /** Carga la caché persistida de chrome.storage.local (solo si está fresca) */
+  function loadPersistedPriceList() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([STORAGE_KEY], (r) => {
+          try {
+            const saved = r && r[STORAGE_KEY];
+            if (saved && saved.cache && saved.time && Date.now() - saved.time < PRICE_LIST_TTL) {
+              priceListCache = saved.cache;
+              priceListTime = saved.time;
+            }
+          } catch (e) { /* storage corrupto */ }
+          resolve();
+        });
+      } catch (e) { resolve(); }
+    });
+  }
+
+  /** Garantiza que la caché persistida se cargue UNA sola vez (dedup de llamadas concurrentes) */
+  function ensureReady() {
+    if (!readyPromise) readyPromise = loadPersistedPriceList();
+    return readyPromise;
+  }
+
+  /** Escribe la caché a chrome.storage.local (array + timestamp) */
+  function persistNow() {
+    try {
+      if (priceListCache && priceListTime > 0) {
+        chrome.storage.local.set({ [STORAGE_KEY]: { cache: priceListCache, time: priceListTime } }).catch(() => {});
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  /** Guarda con debounce (máx. 1 escritura cada SAVE_DEBOUNCE_MS) */
+  function persistCache() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      persistNow();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  // Flush al cerrar/recargar la página: no perder la escritura que estaba
+  // dentro de la ventana de debounce.
+  try {
+    window.addEventListener('beforeunload', () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        persistNow();
+      }
+    });
+  } catch (e) { /* noop */ }
+
+  // Eager load: cargar la caché persistida apenas arranca el módulo, para que
+  // getCacheInfo() (el indicador de caché de la UI) sea correcto desde el
+  // primer paint tras una recarga, sin esperar al primer escaneo.
+  ensureReady().catch(() => {});
+
   // ---- Cola global ----
   let queue = Promise.resolve();
   let lastRequestTime = 0;
@@ -107,6 +172,8 @@
    *  entre los 3 modos. Si se necesita un refresh forzado puntual, usar
    *  CSFloatClient.getPriceList(true) — NO llamarlo en cada escaneo. */
   async function getPriceList(force) {
+    // Esperar a que la caché persistida se cargue (una sola vez al arrancar)
+    await ensureReady();
     if (!force && priceListCache && Date.now() - priceListTime < PRICE_LIST_TTL) {
       return priceListCache;
     }
@@ -119,6 +186,7 @@
       const data = await resp.json();
       priceListCache = data;
       priceListTime = Date.now();
+      persistCache(); // guarda con debounce para sobrevivir a recargas
       return data;
     });
   }
