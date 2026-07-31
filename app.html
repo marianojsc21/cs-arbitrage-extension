@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SaintProfit — Profit Finder</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
     /* ===== RESET & BASE ===== */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -174,7 +174,11 @@
     }
 
     body {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
@@ -333,7 +337,7 @@
       color: var(--text-muted);
       font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       font-weight: 600;
       min-width: 95px;
       flex-shrink: 0;
@@ -477,6 +481,43 @@
     .mode-header .btn-primary:active { transform: translateY(0); }
     .mode-header .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
+    .scan-btn-icon {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .snip-scan-steam {
+      margin-left: 2px;
+    }
+
+    .snip-scan-cs {
+      margin-right: 0;
+    }
+
+    .sniper-col .mode-header .btn-primary.snip-scan-cs {
+      background: linear-gradient(135deg, var(--accent-1), var(--profit-orange));
+    }
+
+    .sniper-col .mode-header .btn-primary.snip-scan-steam {
+      background: linear-gradient(135deg, #1a5a8a, #2a7aba);
+      box-shadow: 0 4px 12px rgba(26,90,138,0.3);
+    }
+
+    .sniper-col .mode-header .btn-primary.snip-scan-steam:hover {
+      box-shadow: 0 6px 18px rgba(26,90,138,0.4);
+    }
+
+    .sniper-col .mode-header .btn-primary.snip-scan-cs.scanning {
+      background: linear-gradient(135deg, var(--accent-2), #cc4400);
+    }
+
+    .sniper-col .mode-header .btn-primary.snip-scan-steam.scanning {
+      background: linear-gradient(135deg, #2a7aba, #0a3a5a);
+    }
+
     .mode-header .btn-primary.scanning {
       background: linear-gradient(135deg, var(--accent-2), #cc4400);
       box-shadow: 0 4px 12px rgba(255,107,53,0.3);
@@ -560,7 +601,7 @@
 
     .mode-stats .stat-value {
       font-size: 1.2rem;
-      font-weight: 800;
+      font-weight: 700;
       background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -579,7 +620,7 @@
     }
 
     .mode-stats .stat-label {
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -773,7 +814,7 @@
       color: var(--accent-1);
       font-size: 0.62rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       font-weight: 700;
       cursor: pointer;
       user-select: none;
@@ -1199,7 +1240,7 @@
       font-size: 0.62rem;
       font-weight: 600;
       transition: all var(--transition);
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
       vertical-align: middle;
     }
 
@@ -1253,7 +1294,7 @@
       background: transparent;
       width: 100%;
       text-align: left;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
     }
 
     .theme-popup-item:hover {
@@ -1368,7 +1409,7 @@
       color: var(--accent-1);
       display: block;
       line-height: 1.2;
-      font-weight: 800;
+      font-weight: 700;
     }
 
     .mode-col.inactive .mode-stats .stat-label {
@@ -1731,7 +1772,7 @@
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-bottom: 12px;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
     }
 
     .steam-sniper-overlay .overlay-alert-card .alert-buy-btn:hover {
@@ -1769,7 +1810,7 @@
       font-weight: 600;
       transition: all 0.2s;
       margin-top: 4px;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
     }
 
     .steam-sniper-overlay .overlay-alert-card .alert-dismiss:hover {
@@ -2679,7 +2720,12 @@
         <div style="display:flex;gap:4px;align-items:center">
           <button class="btn-secondary" id="snipHistoryBtn"><strong>Historial</strong> 📋 <span id="snipHistoryBadge" class="profit-badge-count">0</span></button>
           <button class="btn-secondary" id="snipAlertsBtn" title="Alertas en tiempo real" style="border-color:var(--border);font-size:0.65rem">🔔</button>
-          <button class="btn-primary" id="snipScanBtn">🔍 Escanear</button>
+          <button class="btn-primary snip-scan-cs" id="snipScanCsBtn">
+            <img src="icons/csfloat-link.png" class="scan-btn-icon" alt="CSFloat"> Escanear
+          </button>
+          <button class="btn-primary snip-scan-steam" id="snipScanSteamBtn">
+            <img src="icons/steam-link.webp" class="scan-btn-icon" alt="Steam"> Escanear
+          </button>
         </div>
       </div>
 
@@ -2788,7 +2834,7 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer" style="position:relative">
-      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.5.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.7.0</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
       <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
         <span class="theme-dot saintprofit" id="themeDot"></span>
         <span id="themeLabel">Tema</span>

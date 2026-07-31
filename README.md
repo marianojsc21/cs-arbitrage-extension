@@ -1,33 +1,31 @@
 # 🏛️ SaintProfit — Arbitraje CS2 entre CSFloat y Steam Market
 
-**SaintProfit** (v2.6.0) es una extensión de navegador (Brave/Chrome) que encuentra oportunidades de **arbitraje de precios** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+**SaintProfit** (v3.7.0) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
-Compara precios de **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando la comisión del 15% de Steam.
+Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
-Incluye **2 modos de arbitraje**: **SteamFarm** (CSFloat → Steam para maximizar ganancias) y **Capitallet** (Steam → CSFloat para convertir saldo a wallet).
+Incluye **3 motores**: **SteamFarm** (profit CSFloat → Steam), **Smart Invest** (optimización de cartera tipo Knapsack) y **Market Sniper** (detección de publicaciones mal valoradas, charms y stickers).
 
 ---
 
 ## 📋 Tabla de Contenidos
 
 - [Características](#-características)
-- [Capturas](#-capturas)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Instalación](#-instalación)
 - [Uso](#-uso)
 - [Modos](#-modos)
+- [Market Sniper — Motores de Búsqueda](#-market-sniper--motores-de-búsqueda)
+- [Alertas Steam Sniper](#-alertas-steam-sniper)
 - [Flujo de Escaneo](#-flujo-de-escaneo)
 - [API y Fuentes de Datos](#-api-y-fuentes-de-datos)
 - [Cálculo de Profit](#-cálculo-de-profit)
+- [Oportunidad Score y Confidence Score](#-oportunidad-score-y-confidence-score)
 - [Historial de Búsquedas](#-historial-de-búsquedas)
 - [Filtros](#-filtros)
-- [Ordenamiento](#-ordenamiento)
-- [Contador y Timer en Vivo](#-contador-y-timer-en-vivo)
-- [Indicador ⭐ Conversión Ideal](#-indicador--conversión-ideal)
-- [Filtro Más Vendidos](#-filtro-más-vendidos)
-- [Click en Filas](#-click-en-filas)
-- [Actualizaciones](#-actualizaciones)
+- [Temas](#-temas)
 - [Content Script (Badges en CSFloat)](#-content-script-badges-en-csfloat)
+- [Actualizaciones](#-actualizaciones)
 - [Solución de Problemas](#-solución-de-problemas)
 - [Versiones](#-versiones)
 - [Diseño](#-diseño)
@@ -39,27 +37,29 @@ Incluye **2 modos de arbitraje**: **SteamFarm** (CSFloat → Steam para maximiza
 
 | Característica | Descripción |
 |---|---|
-| **Escaneo Inteligente** | Obtiene todos los items de CSFloat y los filtra antes de consultar Steam |
+| **3 Modos** | SteamFarm (profit) · Smart Invest (cartera) · Market Sniper (oportunidades) |
+| **Escaneo Inteligente** | Obtiene items de CSFloat/Steam y los filtra antes de calcular profit |
 | **12 Categorías** | Skins, Cuchillos, Guantes, Pegatinas, Cajas, Agentes, Llaveros, Parches, Música, Coleccionables, Graffiti |
-| **Profit Real** | Calcula ganancia descontando el 15% de comisión de Steam |
-| **Modo Capitallet** | Modo inverso para convertir saldo Steam → Wallet CSFloat |
-| **⭐ Conversión Ideal** | Estrella dorada cuando la diferencia es < 0.5% en Capitallet |
-| **Filtro Más Vendidos** | Checkbox + columna de volumen en AMBOS modos |
-| **Click en Filas** | Capitallet: click en fila → abre Steam. SteamFarm: click → abre CSFloat |
-| **Filtros en Vivo** | Profit mínimo, rango de precio, categoría, orden — sin re-escanear |
-| **Selector de Orden** | 9 opciones de ordenamiento para SteamFarm, 5 para Capitallet |
-| **Contador + Timer** | 🔍 Items escaneados + ⏱️ tiempo transcurrido en tiempo real |
-| **Historial Persistente** | Guarda resultados en localStorage con Top 7 por profit |
-| **Top 7 Histórico** | Mejores oportunidades de todos los escaneos, visible en modo inactivo |
-| **Auto-Restauración** | Al recargar la página se restaura el último escaneo automáticamente |
+| **Profit Real** | Descuenta comisiones de ambos mercados (Steam 15%, CSFloat 2%) |
+| **Market Sniper** | Detecta skins mal valoradas + arbitraje de charms y stickers |
+| **2 Botones de Escaneo** | Sniper: botón CSFloat 🟠 y botón Steam 🟦, motores independientes |
+| **Alerta Steam Sniper** | Overlay rojo + notificación del sistema si hay cuchillos/guantes < $20 |
+| **Auto-scan en vivo** | Sniper chequea Steam automáticamente cada 45s mientras está activo |
+| **Knapsack Optimizer** | Smart Invest evalúa combinaciones de 1 a N skins con límite de tiempo |
+| **Investment Score** | Puntaje propio: profit + liquidez + volumen + velocidad − riesgo |
+| **Confidence Score** | Qué tan confiable es el valor calculado (volumen, componentes) |
+| **Top Opportunities** | Ranking de mejores oportunidades del día por Investment Score |
+| **Calculadora Compuesta** | Simulador de capitalización (capital inicial, profit medio, operaciones) |
+| **Historial Persistente** | localStorage + chrome.storage.local (dual-write, sobrevive reinstalaciones) |
+| **Top 7 Histórico** | Mejores oportunidades de todos los escaneos por cada modo |
 | **Detener Escaneo** | Botón para detener la búsqueda sin perder resultados parciales |
-| **Tabla Ordenable** | Clic en cualquier columna de la tabla para ordenar ascendente/descendente |
-| **Links Directos** | Iconos CSF → CSFloat y Steam → Steam Market por cada item |
-| **Badges en CSFloat** | Content script que muestra badges de profit directamente en csfloat.com |
-| **Auto-Update** | Sistema de actualización automática desde GitHub |
-| **UI SaintProfit** | Paleta naranja + aqua · Glassmorphism · Animaciones · Diseño responsive |
+| **Links Directos** | Cada item con link a CSFloat y a Steam Market |
+| **Tabla Ordenable** | Clic en columnas para ordenar ascendente/descendente |
+| **3 Temas** | SaintProfit (default), Night (ultra-dark), Amber (cálido) |
+| **Badges en CSFloat** | Content script que muestra badges de profit en csfloat.com |
+| **Auto-Update** | Verificación de actualizaciones desde GitHub |
 | **Glow Dinámico** | Columna activa con glow naranja, inactiva con glow violeta |
-| **Transiciones Suaves** | Animaciones de slide, fade, y pulse en todos los componentes |
+| **Transiciones Suaves** | Animaciones de slide, fade y pulse en columnas y filtros |
 
 ---
 
@@ -68,43 +68,49 @@ Incluye **2 modos de arbitraje**: **SteamFarm** (CSFloat → Steam para maximiza
 ```
 saintprofit/
 ├── manifest.json           # Configuración de la extensión (Manifest V3)
-├── app.html                # Página principal (SPA con CSS embebido + ~3000 líneas)
+├── manifest.chrome.json    # Variante para Chrome
+├── app.html                # Página principal (SPA con CSS embebido)
 ├── popup.html              # Popup minimalista con selector de modos
 ├── README.md               # Esta documentación
 ├── .gitignore              # Archivos ignorados por git
 ├── icons/
-│   ├── icon16.png
-│   ├── icon48.png
-│   ├── icon128.png
+│   ├── icon16.png          # Icono 16px (tab / favicon)
+│   ├── icon48.png          # Icono 48px
+│   ├── icon128.png         # Icono 128px (notificaciones)
 │   ├── icon256.png         # Logo para el header de app.html
 │   ├── brand-header.jpeg   # Lettering SaintProfit
 │   ├── lettering.png       # Lettering grande
 │   ├── lettering-small.png # Lettering para popup
-│   ├── csfloat-link.png    # Icono de link a CSFloat
-│   └── steam-link.webp     # Icono de link a Steam
+│   ├── csfloat-link.png    # Icono de link/botón a CSFloat
+│   └── steam-link.webp     # Icono de link/botón a Steam
 ├── css/
 │   └── styles.css          # Estilos para badges en CSFloat
 └── js/
-    ├── app.js              # Lógica principal: UI, APIs, historial, renderizado (~950 líneas)
-    ├── background.js        # Service worker: proxy Steam, auto-update
-    ├── content.js           # Content script para badges en CSFloat
-    ├── init.js              # Mode switching, Top 7 histórico
-    ├── popup.js             # Lógica del popup
-    └── loader.js            # Cargador de archivos actualizados
+    ├── app.js              # SteamFarm: UI, APIs, historial, renderizado
+    ├── smart-invest.js     # Smart Invest Engine v2 (Portfolio Optimizer)
+    ├── market-sniper.js    # Cross-Market Engine v2 (Market Sniper)
+    ├── background.js       # Service worker: proxy, notificaciones, auto-update
+    ├── content.js          # Content script para badges en CSFloat
+    ├── init.js             # Mode switching, Top 7 histórico, temas
+    ├── popup.js            # Lógica del popup (lee versión del manifest)
+    ├── loader.js           # Cargador de archivos actualizados
+    └── storage.js          # StorageHelper (localStorage + chrome.storage)
 ```
 
 ### 📄 Descripción de Archivos
 
 | Archivo | Rol |
 |---|---|
-| **manifest.json** | Manifiesto MV3: permisos, host_permissions, CSP, content_scripts |
-| **app.html** | Single-page application con CSS embebido y diseño grid de 3 columnas |
-| **popup.html** | Popup minimalista con selector de modos (SteamFarm / Capitallet) |
-| **js/app.js** | IIFE auto-ejecutable (~950 líneas): UI, CSFloat API, Steam API, historial, render |
-| **js/init.js** | Mode switching (active/inactive), renderizado Top 7 histórico, event delegation |
-| **js/background.js** | Service worker: proxy de Steam, detección de actualizaciones |
-| **js/content.js** | Inyectado en csfloat.com: detecta listings y muestra badges de profit |
-| **js/popup.js** | Abre app.html con el modo seleccionado vía query param |
+| **manifest.json** | Manifiesto MV3: permisos, host_permissions, CSP, service worker |
+| **app.html** | Single-page application con CSS embebido y layout de columnas |
+| **popup.html** | Popup minimalista con selector de modos |
+| **js/app.js** | SteamFarm: escaneo, filtros, historial, render de tabla |
+| **js/smart-invest.js** | Smart Invest Engine v2: Knapsack time-based, 3 estrategias, score |
+| **js/market-sniper.js** | Cross-Market Engine v2: providers, valor real, charms/stickers, alertas |
+| **js/init.js** | Mode switching, Top 7 histórico global, sistema de temas |
+| **js/storage.js** | StorageHelper: dual-write localStorage + chrome.storage.local |
+| **js/background.js** | Service worker: notificaciones, detección de actualizaciones |
+| **js/content.js** | Inyectado en csfloat.com: badges de profit en listings |
 | **css/styles.css** | Badges flotantes con animación para CSFloat |
 
 ---
@@ -131,7 +137,7 @@ saintprofit/
    - Seleccioná la carpeta del proyecto
 
 3. **Listo** 🎉
-   - Hacé clic en el icono 🏛️ de SaintProfit en la barra
+   - Hacé clic en el icono de SaintProfit en la barra
    - Elegí un modo y comenzá a escanear
 
 ---
@@ -141,53 +147,115 @@ saintprofit/
 ### Popup de la Extensión
 
 1. Hacé clic en el icono de SaintProfit en la barra de herramientas
-2. Elegí entre **SteamFarm** o **Capitallet**
-3. Se abre la app en una nueva pestaña con el modo seleccionado
-
-### SteamFarm (app.html?mode=profit)
-
-1. **Configurá los filtros** en la columna izquierda: Categoría, Profit Mínimo, Rango CSFloat, Límite, Más Vendidos, Orden
-2. Hacé clic en **"Escanear"**
-3. Seguí el progreso en vivo: contador de items + timer ⏱️
-4. Revisá los resultados en la tabla, ordená por cualquier columna
-5. Hacé clic en una **fila** para abrir CSFloat, o en los iconos CSF/Steam
-6. Usá el **Historial** 📋 para recuperar búsquedas anteriores
-
-### Capitallet (app.html?mode=capitallet)
-
-1. **Configurá los filtros**: Categoría, Precio Steam (min/max), Diferencia Máxima, Límite, Más Vendidos, Orden
-2. Hacé clic en **"Escanear"**
-3. Revisá las coincidencias — buscá items con ⭐ (ideal), 🟢 ganancia o 🔴 pérdida
-4. Hacé clic en una **fila** para abrir Steam
-5. Comprá en Steam, vendé en CSFloat para materializar tu saldo
+2. Elegí entre **SteamFarm**, **Smart Invest** o **Market Sniper**
+3. Se abre la app en una nueva pestaña con el modo seleccionado (`app.html?mode=X`)
 
 ### Cambio de Modo
 
-Hacé clic en el título del modo ("SteamFarm" o "Capitallet") para intercambiarlos. El modo activo ocupa el espacio principal con glow naranja, y el inactivo se reduce a una columna angosta con stats, Top 7 histórico y glow violeta.
+En la app, hacé clic en el **título del modo** o en la **tarjeta de filtros** correspondiente para intercambiar. El modo activo ocupa el espacio principal con glow naranja, los inactivos se minimizan con sus stats y Top 7 histórico.
+
+También: hacer clic en el **logo** de SaintProfit (arriba a la izquierda) vuelve al modo **SteamFarm**.
 
 ---
 
 ## 🔄 Modos
 
-### 💵 SteamFarm
+### 💵 SteamFarm (profit)
+
 Busca la **máxima diferencia** de precio donde CSFloat es barato y Steam es caro:
-- **Compra en**: CSFloat
-- **Vende en**: Steam (con comisión del 15%)
+
+- **Compra en**: CSFloat · **Vende en**: Steam (con comisión del 15%)
 - **Resultado**: Profit en Steam Wallet
 - **Columnas**: Item | CSFloat | Steam (-15%) | Profit $ | Profit % | Vol. Steam | Stock
-- **Score**: `quantity × (1 / min_price)` para priorizar items baratos con stock
+- **Score**: `quantity × (1 / min_price)` — prioriza items baratos con stock
 
-### 💰 Capitallet
-Busca la **mínima diferencia** de precio para convertir saldo Steam a CSFloat:
-- **Compra en**: Steam (con saldo acumulado)
-- **Vende en**: CSFloat
-- **Resultado**: Saldo Steam → Wallet CSFloat
-- **Columnas**: Item | Steam | CSFloat (-2%) | Dif. $ | Dif. % | Vol. Steam | Stock
-- **Indicador visual**: ⭐ Ideal (< 0.5%), 🟢 Ganancia, 🔴 Pérdida
+### 🧠 Smart Invest
+
+Optimiza tu **saldo disponible en Steam** para reinvertir de la forma más eficiente:
+
+1. Ingresá tu **presupuesto** (ej: $37.52)
+2. El motor busca skins en CSFloat, consulta precios en Steam
+3. Resuelve un problema de **Knapsack time-based**: evalúa combinaciones de 1, 2, 3... N skins mientras no supere el límite de tiempo, siempre usando la mayor parte posible del saldo
+4. Ofrece **3 estrategias**: 🟢 Conservadora (máxima liquidez), 🟡 Equilibrada (mejor relación riesgo/beneficio), 🔴 Agresiva (máximo profit)
+5. Cada combinación muestra: Profit $, Profit %, ROI, ROD (retorno diario), Investment Score, Confidence, Liquidez ⭐, Riesgo
+
+Incluye **Calculadora de Capitalización** (capital inicial × profit medio × operaciones) y **Top Opportunities Today**.
+
+### 🎯 Market Sniper
+
+Detecta **publicaciones mal valoradas** ("mispriced listings") que representan oportunidades de compra inmediata:
+
+- **Valor real** de cada publicación = valor de la skin + charms + stickers (calculado con precios de mercado)
+- **Charm Arbitrage**: si los charms equipados valen más que la skin, es una oportunidad (badge 🔑 Charm Dominant)
+- **Sticker Arbitrage**: mismo análisis con stickers (Holo, Foil, Gold, Glitter, Crystal)
+- **Skin Mispriced**: skins cuyo precio publicado está muy por debajo de su valor de mercado
+- **Cross-Market**: compara Steam ↔ CSFloat y recomienda dónde comprar y dónde vender
+- Cada oportunidad muestra: Precio publicado, Valor real, Breakdown (skin/charm/stickers), Profit neto, Opportunity Score, Confidence Score, Liquidez y estrategia óptima (vender completa vs separar componentes)
+
+---
+
+## 🎯 Market Sniper — Motores de Búsqueda
+
+El modo Sniper tiene **2 botones de escaneo independientes**, cada uno con su propio motor:
+
+| Botón | Origen | Qué hace |
+|---|---|---|
+| 🟠 **Escanear** (logo CSFloat) | CSFloat | Trae los últimos listings `buy_now` de CSFloat, calcula el valor real (skin + charms + stickers) y detecta oportunidades |
+| 🟦 **Escanear** (logo Steam) | Steam | FASE 1: busca cuchillos/guantes < $20 en Steam (con alerta). FASE 2: busca items en Steam Market y los compara contra la price-list de CSFloat |
+
+Solo el botón presionado cambia a "Detener" — el otro queda intacto.
+
+> 💡 El botón **🔔** (junto al historial) activa/desactiva las alertas en tiempo real del Sniper. Cuando está activo, las oportunidades con Opportunity Score ≥ 70 generan una notificación inmediata mientras se escanea.
+
+### Botón Steam — FASE 1: Cuchillos/Guantes < $20
+
+1. Busca en Steam Market los items más baratos que empiecen con **★**
+2. Si encuentra un **cuchillo o guante** por debajo del precio límite (default **$20**):
+   - Muestra **overlay rojo** tapando toda la pantalla
+   - Botón **🛒 COMPRA INMEDIATA** que abre el listing de Steam
+   - Envía **notificación del sistema** (chrome.notifications)
+3. Este chequeo también corre **automáticamente cada 45s** mientras el modo Sniper está activo — sin necesidad de apretar nada
+
+### Botón Steam — FASE 2: Cross-Market en Steam
+
+1. Obtiene la **price-list de CSFloat** (1 sola llamada liviana, ~27K items)
+2. Busca en **Steam Market** con queries variadas (★, Sticker, Case, Souvenir, StatTrak, Gloves, Charm), ordenadas por **más vendidos**
+3. Deduplica por `market_hash_name`
+4. Por cada item, busca su precio en CSFloat y calcula el **profit cross-market**
+5. Muestra oportunidades con Score, Confianza y Liquidez
+
+---
+
+## 🔪 Alertas Steam Sniper
+
+Cuando el Sniper encuentra un cuchillo/guante < $20 (ya sea manual o por auto-scan):
+
+```
+┌──────────────────────────────────────┐
+│  🔪 ¡SNIPER!                         │
+│  Oportunidad detectada en Steam      │
+│  ────────────────────────────────    │
+│  🔪 Cuchillo                        │
+│  ★ Gut Knife | Safari Mesh (WW)     │
+│  Precio Steam: $18.50               │
+│  Límite: $20                        │
+│  ┌──────────────────────────────┐   │
+│  │ 🛒 COMPRA INMEDIATA          │   │
+│  └──────────────────────────────┘   │
+│  ✕ Ignorar y cerrar                 │
+└──────────────────────────────────────┘
+```
+
+Además se muestra un **toast** y una **notificación del sistema**:
+> 🔪 ¡SNIPER! ★ Gut Knife | Safari Mesh — $18.50 en Steam!
+
+El límite de precio se configura en el filtro **"Cuchillos/Guantes < $"** de la columna de filtros.
 
 ---
 
 ## 🔄 Flujo de Escaneo
+
+### SteamFarm
 
 ```mermaid
 flowchart TD
@@ -195,23 +263,48 @@ flowchart TD
     B --> C[Filtrar por categoría]
     C --> D[Ordenar por score]
     D --> E[Tomar top N según límite]
-    E --> F[Consultar Steam en lotes de 10]
-    F --> G[Calcular profit o diferencia]
-    G --> H[Mostrar resultados]
+    E --> F[Consultar Steam en lotes]
+    F --> G[Calcular profit real -15%]
+    G --> H[Mostrar resultados + guardar historial]
+```
+
+### Market Sniper (CSFloat)
+
+```mermaid
+flowchart TD
+    A[GET listings CSFloat buy_now] --> B[Parsear: skin + charms + stickers]
+    B --> C[Consultar precio de cada componente en Steam]
+    C --> D[Calcular valor real total]
+    D --> E{¿Precio publicado < valor real?}
+    E -->|Sí| F[Oportunidad con Score + Confianza]
+    E -->|No| G[Descartar]
+```
+
+### Smart Invest
+
+```mermaid
+flowchart TD
+    A[Presupuesto del usuario] --> B[Buscar skins en CSFloat]
+    B --> C[Consultar precios Steam]
+    C --> D[Filtrar por profit mínimo y precio]
+    D --> E[Knapsack time-based: 1..N skins]
+    E --> F[3 estrategias: Conservadora/Equilibrada/Agresiva]
+    F --> G[Mejor combinación por Investment Score]
 ```
 
 ### Detalles Técnicos
 
 | Aspecto | Detalle |
 |---|---|
-| **CSFloat API** | Endpoint público `/api/v1/listings/price-list` — sin autenticación |
-| **Steam API** | `steamcommunity.com/market/priceoverview/` con headers anti-bloqueo |
-| **Rate Limiting** | Lotes de 10 items, 2 segundos entre lotes |
-| **Cache** | Steam cache de 30 minutos para evitar consultas duplicadas |
+| **CSFloat API** | `/api/v1/listings/price-list` (sin auth) y `/api/v1/listings?limit=10&types=buy_now` (paginado con cursor) |
+| **Steam API** | `priceoverview` para precios + `search/render` para búsquedas |
+| **Rate Limiting** | Lotes de 10 items, 5-8s entre lotes, backoff exponencial 12s→45s, máx 5 retries |
+| **Cache de Listings** | `getCachedListings()` con TTL de 2 min — compartido entre scans para no duplicar requests |
+| **Cache de Precios** | 30 min para precios de Steam |
 | **Timer** | ⏱️ `setInterval` con formato `M:SS`, se limpia en todos los exit paths |
 | **Detención** | `scanning = false` interrumpe el loop en el siguiente lote |
-| **Persistencia** | Resultados guardados en `localStorage`, auto-restauración al recargar |
-| **Seguridad .toFixed()** | Todos los renders tienen `|| 0` guard para evitar crashes con datos corruptos |
+| **Persistencia** | Resultados en localStorage + chrome.storage.local (dual-write) |
+| **Auto-restauración** | Al recargar la página se restaura el último escaneo |
 
 ---
 
@@ -232,16 +325,26 @@ Respuesta: Array de objetos con:
 }
 ```
 
-### Steam Market API
-
+Listings detallados (para charms/stickers):
 ```http
-GET https://steamcommunity.com/market/priceoverview/
-    ?appid=730
-    &currency=1
-    &market_hash_name={nombre}
+GET https://csfloat.com/api/v1/listings?limit=10&types=buy_now&cursor={cursor}
 ```
 
-Headers adicionales para evitar bloqueos:
+### Steam Market API
+
+Precios:
+```http
+GET https://steamcommunity.com/market/priceoverview/
+    ?appid=730&currency=1&market_hash_name={nombre}
+```
+
+Búsqueda:
+```http
+GET https://steamcommunity.com/market/search/render/
+    ?query={q}&start=0&count=50&sort_column=quantity&sort_dir=desc&appid=730&norender=1
+```
+
+Headers anti-bloqueo:
 ```
 Accept: application/json
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
@@ -249,7 +352,7 @@ Referer: https://steamcommunity.com/market/
 Origin: https://steamcommunity.com
 ```
 
-**Importante**: Solo se usa `lowest_price` (precio mínimo actual). NO se usa `median_price` (mediana histórica) porque para items de bajo volumen la mediana puede diferir mucho del precio real.
+**Importante**: Solo se usa `lowest_price` (precio mínimo actual). NO se usa `median_price` porque para items de bajo volumen puede diferir mucho del precio real.
 
 ---
 
@@ -262,27 +365,28 @@ profit_usd = steam_price_real - csfloat_price
 profit_percent = ((steam_price_real - csfloat_price) / csfloat_price) × 100
 ```
 
-### Capitallet
+### Market Sniper — Valor Real
 ```
-csfloat_net = csfloat_price × 0.98   (descontando 2% comisión CSFloat)
-diff_usd = csfloat_net - steam_price
-diff_percent = ((csfloat_net - steam_price) / steam_price) × 100
+valor_skin    = precio promedio del mercado (Steam + CSFloat)
+valor_charms  = Σ precio de cada charm en Steam
+valor_stickers = Σ precio de cada sticker en Steam
+valor_real    = valor_skin + valor_charms + valor_stickers
+
+profit_neto_completo = valor_real × (1 - comisión mercado) - precio_publicado
+profit_neto_separado = (skin×0.85 + charms×0.85 + stickers×0.85) - precio_publicado
+
+Descuento % = ((valor_real - precio_publicado) / valor_real) × 100
 ```
 
-### Ejemplo SteamFarm
+### Ejemplo Charm Arbitrage
 
-| Item | CSFloat | Steam (bruto) | Steam (-15%) | Profit $ | Profit % |
-|---|---|---|---|---|---|
-| AK-47 Redline FT | $15.00 | $22.00 | $18.70 | +$3.70 | +24.7% |
-| AWP Asiimov BS | $28.00 | $38.00 | $32.30 | +$4.30 | +15.4% |
-
-### Ejemplo Capitallet
-
-| Item | Steam | CSFloat (-2%) | Dif. $ | Dif. % | Indicador |
-|---|---|---|---|---|---|
-| AK-47 Redline FT | $18.12 | $18.50 | +$0.38 | +2.1% | 🟢 Ganancia |
-| Gut Knife Safari WW | $113.00 | $114.20 | +$1.20 | +1.1% | ⭐ Ideal |
-| AWP Sun in Leo | $2.80 | $2.75 | -$0.05 | -1.8% | 🔴 Pérdida |
+| Item | Valor | |
+|---|---|---|
+| USP-S (skin) | $2.10 | |
+| Charm Baby Karat T | $1.65 | |
+| **Valor real** | **$3.75** | |
+| Precio publicado | $2.35 | |
+| **Ganancia potencial** | **+$1.40** | 🟢 |
 
 ### Categorías Detectadas Automáticamente
 
@@ -302,50 +406,73 @@ diff_percent = ((csfloat_net - steam_price) / steam_price) × 100
 
 ---
 
+## 📊 Oportunidad Score y Confidence Score
+
+### Opportunity Score (0–100)
+
+```
+Score = descuento (máx 30) + profit neto (máx 25) + liquidez (15%)
+      + bonus charms (máx 15) + bonus stickers (máx 10) + volumen (5)
+      + bonus mispriced (15 directo / 10 cross-market)
+      + bonus accesorios ≥30% (8) + bonus cross-market (5)
+
+Penalizaciones no lineales:
+  - profit < $1      → ×0.5
+  - descuento > 70%  → ×0.6  (demasiado bueno para ser cierto)
+  - confianza < 30   → ×0.5
+```
+
+### Confidence Score (0–100)
+
+```
+50% por volumen + 20% charms + 15% stickers + 15% volumen alto
+-10 pts por cada componente con valor incierto (sin historial de ventas)
+```
+
+Los componentes sin historial se marcan como **"valor incierto"** (amarillo) y se reduce el Confidence Score — nunca se asigna un precio arbitrario.
+
+### Liquidez ⭐
+
+| Estrellas | Volumen 24h |
+|---|---|
+| ★★★★★ | > 1000 |
+| ★★★★ | 500–1000 |
+| ★★★ | 100–500 |
+| ★★ | 10–100 |
+| ★ | 1–10 |
+
+---
+
 ## 📋 Historial de Búsquedas
 
-Cada escaneo se guarda automáticamente en **localStorage** con todos los datos necesarios para restauración.
+Cada escaneo se guarda automáticamente con **dual-write** (`StorageHelper`): se escribe en `localStorage` y en `chrome.storage.local` — así sobrevive incluso a la reinstalación de la extensión.
 
-### Datos Guardados por Entrada
+### Storage Keys
 
-| Campo | Descripción |
+| Modo | Key |
 |---|---|
-| `id` | Identificador único (timestamp + random) |
-| `date` | Timestamp del escaneo |
-| `label` | Fecha formateada local (es-AR) |
-| `filters` | Categoría, Profit, Precios, Límite usados |
-| `stats` | Total items, escaneados, profit promedio, mejor %, profit total |
-| `topResults` | Top 7 items con mayor profit (nombre, precios, %) |
-| `results` | Array completo de resultados para restauración |
+| SteamFarm | `saintprofit_history` |
+| Smart Invest | `saintprofit_invest_history` |
+| Market Sniper | `saintprofit_opportunity_history` |
+| Tema | `saintprofit_theme` |
+| Fees | `saintprofit_invest_fees` |
 
 ### Funcionalidades
 
 | Acción | Cómo |
 |---|---|
-| **Ver historial** | Clic en 📋 **Historial** en la barra de controles |
-| **Restaurar escaneo** | Clic en cualquier entrada del historial |
+| **Ver historial** | Clic en 📋 **Historial** en la barra de controles del modo |
+| **Restaurar escaneo** | Clic en cualquier entrada del historial → carga los resultados en la tabla con badge "📂 Historial: ..." |
 | **Eliminar entrada** | Clic en ✕ en la entrada |
 | **Borrar todo** | Clic en 🗑️ en el header del panel |
-| **Auto-restauración** | Al recargar la página se restaura el último escaneo automáticamente |
-| **Top 7 en el historial** | Cada entrada muestra inline sus mejores items |
-| **Límite** | Máximo 20 entradas (las más viejas se descartan automáticamente) |
-
-### Top 7 Histórico Global
-
-En la columna del **modo inactivo** se muestra un **Top 7 global** que agrega los mejores items de TODOS los escaneos históricos (sin duplicados), ordenados por profit. Al hacer clic en un item, abre su página en CSFloat (modo SteamFarm) o Steam (modo Capitallet).
-
-### Historial Separado por Modo
-
-| Modo | Storage Key |
-|---|---|
-| SteamFarm | `saintprofit_history` |
-| Capitallet | `saintprofit_cap_history` |
+| **Top 7 Histórico** | Mejores items de TODOS los escaneos en la columna del modo inactivo |
+| **Límite** | Máximo 20 entradas por modo (las más viejas se descartan) |
 
 ---
 
 ## 🎛️ Filtros
 
-Los filtros están organizados en **2 tarjetas separadas** en la columna izquierda, una para cada modo. Funcionan **en vivo** sobre los resultados ya escaneados (sin re-escanear). Se guardan en localStorage entre sesiones.
+Los filtros están organizados en **tarjetas separadas** en la columna izquierda, una por cada modo. Solo se expande la del modo seleccionado; las demás quedan minimizadas. Funcionan **en vivo** sobre los resultados ya escaneados.
 
 ### SteamFarm
 
@@ -353,131 +480,46 @@ Los filtros están organizados en **2 tarjetas separadas** en la columna izquier
 |---|---|---|---|
 | **Categoría** | Select | Todas | Skins, Cuchillos, Guantes, etc. (12 opciones) |
 | **Profit Mínimo** | Número | 10% | 1–999% |
-| **Precio CSFloat** | Número | $3 – $50 | Mín y máx (2 filas) |
+| **Precio CSFloat** | Número | $3 – $50 | Mín y máx |
 | **Límite** | Select | 50 | 15 / 30 / 50 / 100 / 200 |
 | **🔥 Más Vend.** | Checkbox | off | Solo items con volumen en Steam |
 | **Orden** | Select | Profit % ↓ | 9 opciones |
 
-### Capitallet
+### Smart Invest
 
 | Filtro | Tipo | Default | Opciones |
 |---|---|---|---|
+| **💰 Presupuesto** | Número | $37.52 | Tu saldo en Steam |
 | **Categoría** | Select | Todas | 12 opciones |
-| **Precio Steam** | Número | $3 – $125 | Mín y máx (2 filas) |
-| **Dif. Máx.** | Número | 5% | 0–100% |
-| **Límite** | Select | 50 | 15 / 30 / 50 / 100 / 200 |
-| **🔥 Más Vend.** | Checkbox | off | Solo items con volumen en Steam |
-| **Orden** | Select | Menor dif. | 5 opciones |
+| **Profit mín.** | Número | 5% | 0–999% |
+| **Precio CSFloat** | Número | $1 – $500 | Mín y máx |
+| **Límite** | Select | 50 | 50 / 100 / 200 |
+
+### Market Sniper
+
+| Filtro | Tipo | Default | Opciones |
+|---|---|---|---|
+| **Profit mín.** | Número | $2 | Profit neto mínimo en USD |
+| **Desc. mín.** | Número | 10% | Descuento vs valor real |
+| **Charm mín.** | Número | $0.50 | Valor mínimo de charms |
+| **Sticker mín.** | Número | $0.30 | Valor mínimo de stickers |
+| **Acc % mín.** | Número | 0% | Accesorios ≥ X% del valor total (0 = off) |
+| **Límite** | Select | 30 | 30 / 60 / 90 / 120 |
+| **🔪 Cuchillos/Guantes <** | Número | $20 | Límite para la alerta Steam Sniper |
 
 ---
 
-## 🔄 Ordenamiento
+## 🎨 Temas
 
-### SteamFarm — 9 Opciones de Orden
+Disponibles desde el footer (botón "Tema"):
 
-| Opción | Ordena por |
+| Tema | Descripción |
 |---|---|
-| ⬇ Profit % ↓ | Mayor profit porcentual primero (default) |
-| ⬆ Profit % ↑ | Menor profit porcentual primero |
-| ⬇ Profit $ ↓ | Mayor profit en dólares primero |
-| ⬆ Profit $ ↑ | Menor profit en dólares primero |
-| ⬆ CSFloat ↑ | Precio CSFloat más barato primero |
-| ⬇ CSFloat ↓ | Precio CSFloat más caro primero |
-| ⬇ Stock ↓ | Mayor stock primero |
-| ⬆ Stock ↑ | Menor stock primero |
-| 🔥 Más vendidos | Mayor volumen en Steam primero |
+| **SaintProfit** | Default: naranja + aqua + negro |
+| **Night** | Ultra-dark, aún más profundo |
+| **Amber** | Cálido, tonos ámbar |
 
-### Capitallet — 5 Opciones de Orden
-
-| Opción | Ordena por |
-|---|---|
-| ⬆ Menor dif. | Menor diferencia porcentual (default) |
-| ⬇ Mayor dif. | Mayor diferencia porcentual |
-| ⬆ CSFloat ↑ | Precio CSFloat ascendente |
-| ⬇ CSFloat ↓ | Precio CSFloat descendente |
-| 🔥 Más vendidos | Mayor volumen en Steam primero |
-
-Además, se puede hacer clic en cualquier **header de columna** de la tabla para ordenar ascendente/descendente con indicador visual (↑↓).
-
----
-
-## ⏱️ Contador y Timer en Vivo
-
-Durante el escaneo se muestran en tiempo real:
-
-```
-📊 Lote 3/5 | Verificando 10 items... (5 con profit)
-████████████████░░░░░░░░░░░░░░░░░ 45%
-🔍 Items escaneados: 30 / 50     ⏱️ 1:23
-```
-
-- **Contador**: Se actualiza después de cada lote de 10 items
-- **Timer**: Arranca al presionar "Escanear" (incluye el tiempo de obtener la lista de CSFloat)
-- **Formato**: `M:SS` con `setInterval` de 1 segundo
-- **Limpieza**: El timer se detiene al completar, detener manualmente, o si hay error
-- **Independiente**: Cada modo tiene su propio timer y contador
-
----
-
-## ⭐ Indicador ⭐ Conversión Ideal
-
-En el modo **Capitallet**, cuando la diferencia entre CSFloat (-2%) y Steam es **menor a 0.5%**, el badge de Dif. % se ilumina:
-
-| Diferencia | Badge | Significado |
-|---|---|---|
-| **< 0.5%** | ⭐ **+0.3%** (oro + pulso) | **¡Conversión ideal!** — perdés casi nada |
-| 0.5% – 1% | 🟢 **+0.8%** (verde) | Buena conversión |
-| 1% – 3% | 🟡 **+2.1%** (amarillo) | Conversión aceptable |
-| > 3% | 🟠 **+4.5%** (naranja) | Mucha pérdida |
-
-Los items con ⭐ son los mejores candidatos para convertir saldo de Steam a CSFloat wallet.
-
----
-
-## 🔥 Filtro Más Vendidos
-
-Disponible en **ambos modos** (SteamFarm y Capitallet):
-
-### Checkbox "Solo items con volumen"
-- Cuando está activado, solo se muestran items que tienen **volumen de ventas en Steam** (> 0 ventas en 24h)
-- Ideal para filtrar items sin liquidez
-
-### Columna "Vol. Steam"
-- Muestra el volumen de ventas en las últimas 24h
-- Color **aqua** si hay volumen, **gris** si es 0 (se muestra `—`)
-- Ordenable por click en el header
-
-### Opción de orden "🔥 Más vendidos"
-- Ordena los resultados por **mayor volumen primero**
-- Útil para encontrar los items más líquidos
-
----
-
-## 👆 Click en Filas
-
-### Capitallet
-Click en cualquier parte de una fila de resultados → abre **Steam Market** en una nueva pestaña. Los iconos CSF/Steam al final de la fila siguen funcionando independientemente.
-
-### SteamFarm
-Click en cualquier parte de una fila de resultados → abre **CSFloat** en una nueva pestaña.
-
-### Top 7 Histórico
-- **Modo SteamFarm activo**: click en un item del Top 7 → abre CSFloat
-- **Modo Capitallet activo**: click en un item del Top 7 → abre Steam
-
----
-
-## 🔄 Actualizaciones
-
-El service worker (`js/background.js`) verifica actualizaciones cada hora desde GitHub:
-```
-https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-extension/main/manifest.json
-```
-
-Si hay una versión más nueva, descarga los archivos actualizados y los almacena en `chrome.storage.local`.
-
-### Archivos que se actualizan automáticamente:
-- `js/app.js` · `js/content.js` · `js/popup.js` · `css/styles.css` · `popup.html` · `app.html`
+La selección persiste en localStorage y se aplica inmediatamente.
 
 ---
 
@@ -489,46 +531,62 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 2. **Consulta a Steam**: Obtiene precio de Steam vía background.js
 3. **Cálculo de profit**: Misma fórmula (×0.85)
 4. **Badge flotante**: Muestra CSFloat, Steam y Ganancia con color según %
-   - 🟢 Aqua ≥30%
-   - 🟡 Amarillo ≥20%
-   - 🟠 Naranja ≥10%
-   - 🔴 Rojo <10%
+   - 🟢 Aqua ≥30% · 🟡 Amarillo ≥20% · 🟠 Naranja ≥10% · 🔴 Rojo <10%
 5. **Indicador global**: Badge "SaintProfit: ON / OFF" con dot animado
-6. **Batch Processing**: Listings procesados en lotes de 5, con stagger de 300ms y 2.5s entre lotes
+6. **Batch Processing**: Listings procesados en lotes con stagger y delay entre lotes
+
+---
+
+## 🔄 Actualizaciones
+
+El service worker (`js/background.js`) verifica actualizaciones cada hora desde GitHub:
+```
+https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-extension/main/manifest.json
+```
+
+Si hay una versión más nueva, descarga los archivos actualizados y los almacena en `chrome.storage.local` (vía `js/loader.js`).
 
 ---
 
 ## 🔧 Solución de Problemas
 
+### ❌ "CSFloat rate limit" / 429
+**Causa**: Demasiadas consultas a CSFloat en poco tiempo.
+
+**Solución**:
+1. Esperá 30-60 segundos y reintentá
+2. Bajá el límite de listings en los filtros del Sniper
+3. El motor ya espera 5-8s entre lotes y hace backoff exponencial (hasta 45s) con 5 reintentos
+
+### ❌ "CSFloat error: 400 - limit is too high"
+**Causa**: El límite de items por request excede lo permitido.
+
+**Solución**: Reducí el límite en los filtros. El motor usa lotes de 10 por request.
+
 ### ❌ "No se encontraron listados en CSFloat"
 **Causa**: CSFloat cambió su API o hay rate limiting.
 
-**Solución**: 
+**Solución**:
 1. Verificá que `https://csfloat.com` sea accesible
 2. Esperá 30 segundos y reintentá
-
-### ❌ Steam bloquea las consultas (429)
-**Causa**: Demasiadas consultas a Steam Market en poco tiempo.
-
-**Solución**: 
-1. Bajá el límite de items a 15 o 30
-2. Esperá 1 minuto entre escaneos
-3. La extensión espera 2s entre lotes de 10 items
 
 ### ❌ "Extension context invalidated"
 **Causa**: El service worker se recargó mientras el content script seguía activo.
 
-**Solución**: Recargá la página de CSFloat. La extensión ahora maneja este error gracefulmente.
+**Solución**: Recargá la página de CSFloat. La extensión maneja este error gracefulmente.
 
 ### ❌ Error CSP en consola
-**Causa**: Una extensión de terceros o Brave intenta inyectar un script en la página de SaintProfit.
+**Causa**: Una extensión de terceros intenta inyectar un script en la página de SaintProfit.
 
 **Solución**: Es **inofensivo** — la extensión funciona correctamente de todos modos. Ignorar.
 
-### ❌ "Cannot read properties of undefined (reading 'toFixed')"
-**Causa**: Datos corruptos en el historial (escaneos de versiones anteriores).
+### ❌ Steam no devuelve precios (priceoverview null)
+**Causa**: Steam bloquea la IP temporalmente o el item no tiene listado activo.
 
-**Solución**: Borrá el historial (🗑️) y escaneá de nuevo. Desde v2.6.0 todos los renders están protegidos con `|| 0`.
+**Solución**:
+1. Esperá 1-2 minutos entre escaneos
+2. Verificá que el item exista en `steamcommunity.com/market`
+3. El motor maneja 429 con espera automática de 5s
 
 ---
 
@@ -536,18 +594,20 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 
 | Versión | Cambios |
 |---|---|
-| **v3.5.0** | 🗄️ **StorageHelper** — historial persistente con `chrome.storage.local` + `localStorage` (dual-write, sobrevive reinstalaciones) · 🎯 Border sólido 2px en columna activa (reemplaza box-shadow clipado) · 📐 Columna de filtros 340px con espaciado general refinado · 🔲 Bordes de filtros al 45% opacidad · 🧩 Modo Smart Invest + Market Sniper · ⚡ Optimización scroll vertical · 🎨 Tema Night/Amber actualizados |
-| **v2.8.0** | 🧠 Smart Invest Engine v2 — Portfolio Optimizer con knapsack time-based · 🎯 Cross-Market Opportunity Engine con proveedores Steam/CSFloat · ⭐ Alertas Steam Sniper para cuchillos/guantes < $20 · 📊 Calculadora de capitalización compuesta |
-| **v2.7.0** | 🎨 **Sistema de temas**: SaintProfit (default), Night (ultra-dark), Amber (cálido) · Selector de tema en el footer · Persistencia en localStorage · Toast de notificación al cambiar |
-| **v2.6.0** | 🐛 `toFixed()` crash fix en ALL renders (17 llamadas protegidas) · Min price en Capitallet · README actualizado |
-| **v2.5.0** | 🔥 Click en filas de Capitallet → abre Steam · ⭐ Indicador de conversión ideal · Más vendidos en SteamFarm · Columna Vol. Steam en ambos modos |
-| **v2.4.0** | 🔥 Filtro "Más vendidos" para Capitallet · Columna Vol. Steam · Fix duplicado Dif. Máx. |
-| **v2.3.0** | ✨ Filtro "Orden" (8 opciones SteamFarm, 4 Capitallet) · Contador 🔍 y Timer ⏱️ en tiempo real · Timer cleanup en todos los exit paths · Animación de entrada en filtros · Glow violeta para modo inactivo · Transiciones de 0.2s en columnas |
-| **v2.2.0** | ✨ Dos tarjetas de filtros separadas · Híbrido labels/inputs · Bordes inferiores corregidos · Dashboard padding refinado |
-| **v2.1.0** | ✨ Layout 3-columnas · Modo inactivo se achica · Top 7 histórico global · Diseño responsive · Brand header con lettering |
-| **v2.0.0** | ✨ **Rebrand**: CSMuza → **SaintProfit** · Paleta naranja + aqua · Popup minimalista · README con changelog |
+| **v3.7.0** | 📚 README actualizado · Limpieza de Capitallet (modo y filtros) · Botones de escaneo independientes en Sniper (CSFloat/Steam) · Motor Steam con FASE 1 (cuchillos/guantes < $20 con alerta) + FASE 2 (cross-market desde Steam) · Filtro estricto de charms dominantes · Rate limiting reforzado (cache compartido, lotes de 10, backoff 12s→45s, 5 retries) |
+| **v3.6.x** | Botones de escaneo separados por mercado en Sniper · Alertas Steam Sniper (overlay rojo + notificación) · Auto-scan de cuchillos/guantes cada 45s · Cache de listings compartido |
+| **v3.5.0** | 🗄️ StorageHelper — historial dual-write (`chrome.storage.local` + `localStorage`) · Modo Smart Invest + Market Sniper integrados · Tema Night/Amber actualizados · Columnas con glow |
+| **v2.8.0** | 🧠 Smart Invest Engine v2 — Portfolio Optimizer con knapsack time-based · 🎯 Cross-Market Opportunity Engine con proveedores Steam/CSFloat · ⭐ Alertas Steam Sniper · 📊 Calculadora de capitalización compuesta |
+| **v2.7.0** | 🎨 **Sistema de temas**: SaintProfit, Night, Amber · Selector en el footer · Persistencia |
+| **v2.6.0** | 🐛 `toFixed()` crash fix en ALL renders · Min price en Capitallet |
+| **v2.5.0** | 🔥 Click en filas · ⭐ Indicador de conversión ideal · Más vendidos |
+| **v2.4.0** | 🔥 Filtro "Más vendidos" · Columna Vol. Steam |
+| **v2.3.0** | ✨ Filtro "Orden" · Contador 🔍 y Timer ⏱️ en tiempo real |
+| **v2.2.0** | ✨ Tarjetas de filtros separadas · Híbrido labels/inputs |
+| **v2.1.0** | ✨ Layout de columnas · Modo inactivo se achica · Top 7 histórico |
+| **v2.0.0** | ✨ **Rebrand**: CSMuza → **SaintProfit** · Paleta naranja + aqua · Popup minimalista |
 | **v1.12.0** | Popup simplificado con selector de modos · URL-based tab selection |
-| **v1.11.0** | Batch processing en content.js (5x más rápido) |
+| **v1.11.0** | Batch processing en content.js |
 | **v1.10.0** | Indicador visual 🟢/🔴 en Capitallet · Filas coloreadas |
 | **v1.9.0** | Historial de Capitallet con persistencia propia |
 | **v1.8.0** | Modo Capitallet como pestaña separada |
@@ -563,25 +623,24 @@ Cuando navegás en `csfloat.com` con la extensión activa:
 
 | Color | Hex | Uso |
 |---|---|---|
-| 🟠 **Naranja** | `#ff6b35` | Acento principal, botones, headers, glow activo (accent-1) |
-| 🟠 **Naranja claro** | `#ff8c42` | Gradientes, timer (accent-2) |
-| 🟢 **Aqua** | `#00d4aa` | Profit, contador, highlights (accent-3) |
-| 🟣 **Violeta** | `#a855f7` | Glow del modo inactivo |
+| 🟠 **Naranja** | `#ff6b35` | Acento principal, botones, glow activo |
+| 🟠 **Naranja claro** | `#ff8c42` | Gradientes, timer |
+| 🟢 **Aqua** | `#00d4aa` | Profit, contador, highlights |
+| 🟣 **Violeta** | `#a855f7` | Glow del modo inactivo, Smart Invest |
+| 🔴 **Rojo** | `#ff3366` | Alertas, riesgo, Market Sniper |
 | ⚫ **Negro** | `#0a0a0a` | Fondo principal |
 | ⚪ **Blanco** | `#f0f0f0` | Texto primario |
-| 🔘 **Gris** | `#666–#999` | Textos secundarios, bordes, muted |
-| ⭐ **Oro** | `#ffd700` | Badge de conversión ideal |
+| 🔘 **Gris** | `#666–#999` | Textos secundarios, bordes |
+| ⭐ **Oro** | `#ffd700` | Conversión ideal, rank #1 |
 
 ### Efectos Visuales
 
 - **Glassmorphism**: `backdrop-filter: blur(8px)` en tarjetas
-- **Gradientes**: Botones con gradiente naranja + glow
+- **Gradientes**: Botones con gradiente + glow
 - **Glow dinámico**: Columna activa → naranja; inactiva → violeta
-- **Animaciones**: `slideDown`, `fadeIn`, `rowIn`, `shimmer`, `dot-pulse`, `stat-pulse`, `starPulse`
-- **Hover states**: Todos los elementos interactivos tienen transiciones suaves
-- **Scrollbar**: Personalizada y sutil (6px, semi-transparente)
-- **Fondo animado**: 3 gradientes radiales en posiciones fijas
-- **Diseño responsive**: 3 breakpoints (full, ≤1100px, ≤700px)
+- **Animaciones**: `slideDown`, `fadeIn`, `rowIn`, `shimmer`, `dot-pulse`, `starPulse`
+- **Hover states**: Todos los elementos interactivos con transiciones suaves
+- **Fondo animado**: Gradientes radiales en posiciones fijas
 
 ### Fuente
 

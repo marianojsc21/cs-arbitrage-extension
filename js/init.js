@@ -20,12 +20,18 @@ function switchMode(mode) {
   if (mode === 'profit') {
     if (profitCol) { profitCol.classList.remove('inactive'); profitCol.classList.add('active'); }
     dashboard.classList.add('mode-profit');
+    // Stop Steam Sniper auto-poll when leaving sniper mode
+    if (typeof window.stopSteamSniperAutoScan === 'function') window.stopSteamSniperAutoScan();
   } else if (mode === 'invest') {
     if (invCol) { invCol.classList.remove('inactive'); invCol.classList.add('active'); }
     dashboard.classList.add('mode-invest');
+    // Stop Steam Sniper auto-poll when leaving sniper mode
+    if (typeof window.stopSteamSniperAutoScan === 'function') window.stopSteamSniperAutoScan();
   } else if (mode === 'sniper') {
     if (sniperCol) { sniperCol.classList.remove('inactive'); sniperCol.classList.add('active'); }
     dashboard.classList.add('mode-sniper');
+    // Restart Steam Sniper auto-poll when entering sniper mode
+    if (typeof window.startSteamSniperAutoScan === 'function') window.startSteamSniperAutoScan();
   }
   // Highlight the corresponding filter card
   updateFilterCardHighlight(mode);

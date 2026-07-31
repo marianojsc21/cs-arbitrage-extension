@@ -177,13 +177,11 @@
       let cursor = null;
       let fetched = 0;
       let retries = 0;
-      const MAX_RETRIES = 3;
+      const MAX_RETRIES = 5;
+      const BATCH_SIZE = 10;
 
       while (fetched < maxListings) {
-        // CSFloat rejects unknown/incorrect filter params with 400.
-        // Only pass `types=buy_now` — CSFloat expects this exact param.
-        // We also client-side filter by listing.type === 'purchase' to be safe.
-        let url = `${CSFLOAT_LISTINGS_API}?limit=15&types=buy_now`;
+        let url = `${CSFLOAT_LISTINGS_API}?limit=${BATCH_SIZE}&types=buy_now`;
         if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
         try {
           const resp = await fetch(url, {
@@ -202,10 +200,10 @@
               try { errorBody = await resp.text(); } catch(e) {}
               throw new Error(`CSFloat rate limit: ${errorBody.slice(0,200)}`);
             }
-            const waitMs = Math.min(10000 * Math.pow(2, retries), 30000);
+            const waitMs = Math.min(12000 * Math.pow(2, retries), 45000);
             retries++;
             await new Promise(r => setTimeout(r, waitMs));
-            continue; // Retry the same request
+            continue;
           }
 
           if (!resp.ok) {
@@ -214,28 +212,24 @@
             throw new Error(`CSFloat error: ${resp.status} - ${errorBody.slice(0,200)}`);
           }
 
-          retries = 0; // Reset retries on success
+          retries = 0;
           const data = await resp.json();
           const batch = data.data || data || [];
           if (!batch.length) break;
           for (const l of batch) {
-            // 🔥 CRITICAL: Skip auctions (pujas) — the price shown is the current bid,
-            // NOT the final price, and would create false opportunities.
-            // CSFloat listings have `type: 'purchase'` for buy-now, `type: 'auction'` for auctions.
             if (l.type && l.type !== 'purchase') continue;
-            // Also skip non-published states
             if (l.state && l.state !== 'published') continue;
             listings.push(l);
             fetched++;
             if (fetched >= maxListings) break;
           }
           cursor = data.cursor || data.next_cursor || null;
-          if (!cursor && batch.length < 15) break;
-          // Wait 2.5-3.5s between batches to avoid rate limiting
-          await new Promise(r => setTimeout(r, 2500 + Math.random() * 1000));
+          if (!cursor && batch.length < BATCH_SIZE) break;
+          // Wait 5-8s between batches
+          await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
         } catch (e) {
           if (e.message.includes('rate limit') || e.message.includes('429')) {
-            throw e; // Already handled with retries
+            throw e;
           }
           throw e;
         }
@@ -305,6 +299,10 @@
       this.onOpportunity = null; // callback for real-time alerts
       this._loadHistory();
       this._pollTimer = null;
+      // Cache de listings para compartir entre CSFloat y Steam scans
+      this._listingsCache = null;
+      this._listingsCacheTime = 0;
+      this._listingsCacheTTL = 120 * 1000; // 2 minutos de cache
     }
 
     // ======================================================================
@@ -674,9 +672,9 @@
       this._historyLabel = null; // Clear history badge on fresh scan
 
       try {
-        // Phase 1: Fetch CSFloat listings
+        // Phase 1: Fetch CSFloat listings (with caching to avoid duplicate API calls)
         this._emit(0, maxListings, '🔍 Obteniendo listings de CSFloat...', 'csfloat');
-        const csfloatListings = await this.csfloatProvider.fetchListings({ maxListings });
+        const csfloatListings = await this.getCachedListings(maxListings);
         const parsed = csfloatListings
           .map(l => this.csfloatProvider.parseListing(l))
           .filter(Boolean);
@@ -737,6 +735,17 @@
     }
 
     stopScan() { this.scanning = false; }
+
+    /** Get cached listings if available, otherwise fetch fresh from CSFloat API */
+    async getCachedListings(maxListings) {
+      if (this._listingsCache && Date.now() - this._listingsCacheTime < this._listingsCacheTTL) {
+        return this._listingsCache;
+      }
+      const fresh = await this.csfloatProvider.fetchListings({ maxListings });
+      this._listingsCache = fresh;
+      this._listingsCacheTime = Date.now();
+      return fresh;
+    }
 
     // ======================================================================
     // REAL-TIME POLLING
@@ -1199,11 +1208,33 @@
     container.innerHTML = html;
   }
 
-  async function startScan() {
-    if (!engine) return;
-    if (engine.scanning) { stopScan(); return; }
+  /// Track which source is currently scanning (independiente por botón)
+  let currentScanSource = null;
 
-    const scanBtn = $('snipScanBtn');
+  /** Helper: get the correct button element for a given source */
+  function _scanBtn(source) {
+    return source === 'csfloat' ? $('snipScanCsBtn') : $('snipScanSteamBtn');
+  }
+
+  /** Shared scan setup: returns options + resets UI. Solo modifica el botón del source indicado. */
+  function _scanSetup(source) {
+    if (!engine) return null;
+    // Si ya hay un escaneo corriendo, detenerlo primero y empezar el nuevo
+    if (engine.scanning) {
+      engine.stopScan();
+      // Restaurar el botón del source anterior antes de empezar el nuevo
+      if (currentScanSource) {
+        const oldBtn = _scanBtn(currentScanSource);
+        if (oldBtn && oldBtn._originalHTML) {
+          oldBtn.innerHTML = oldBtn._originalHTML;
+          oldBtn.classList.remove('scanning');
+          delete oldBtn._originalHTML;
+        }
+      }
+      // Pequeña pausa para que se limpie
+    }
+
+    const scanBtn = _scanBtn(source);
     const progress = $('snipProgress');
     const statusEl = $('snipStatus');
     const progressFill = $('snipProgressFill');
@@ -1213,24 +1244,31 @@
     const container = $('snipResultsContainer');
 
     // Clear history badge when starting a fresh scan
-    if (engine) engine._historyLabel = null;
+    engine._historyLabel = null;
+    currentScanSource = source;
 
-    if (scanBtn) { scanBtn.textContent = '⏹ Detener'; scanBtn.classList.add('scanning'); }
+    // Solo modificar el botón que se apretó
+    if (scanBtn) {
+      scanBtn._originalHTML = scanBtn.innerHTML;
+      scanBtn.innerHTML = '<span class="scanning-indicator">⏹</span> Detener';
+      scanBtn.classList.add('scanning');
+    }
     if (progress) progress.classList.add('show');
-    if (container) container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">📡</span><h3>Cargando...</h3><p>Obteniendo listings de CSFloat</p></div>';
-
-    const maxListings = parseInt($('snipMaxListings')?.value || '100');
-    const minProfit = parseFloat($('snipMinProfit')?.value || '2');
-    const minDiscount = parseInt($('snipMinDiscount')?.value || '10');
-    const minCharmValue = parseFloat($('snipMinCharmValue')?.value || '0.50');
-    const minStickerValue = parseFloat($('snipMinStickerValue')?.value || '0.30');
-    const minAccessoryPct = parseInt($('snipAccessoryPct')?.value || '0');
-    const snipKnifeScan = $('snipKnifeScan')?.checked || false;
+    if (container) container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">📡</span><h3>Cargando...</h3><p>Escaneando...</p></div>';
 
     if (scanTimer) scanTimer.textContent = '0:00';
     if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
     scanTimerInterval = setInterval(() => { if (scanTimer) scanTimer.textContent = formatTimer(Date.now() - scanStartTime); }, 1000);
     scanStartTime = Date.now();
+
+    const options = {
+      maxListings: parseInt($('snipMaxListings')?.value || '100'),
+      minProfit: parseFloat($('snipMinProfit')?.value || '2'),
+      minDiscount: parseInt($('snipMinDiscount')?.value || '10'),
+      minCharmValue: parseFloat($('snipMinCharmValue')?.value || '0.50'),
+      minStickerValue: parseFloat($('snipMinStickerValue')?.value || '0.30'),
+      minAccessoryPct: parseInt($('snipAccessoryPct')?.value || '0'),
+    };
 
     engine.setProgressCallback((p) => {
       if (statusEl) statusEl.textContent = p.status;
@@ -1239,39 +1277,355 @@
       if (scanTotal) scanTotal.textContent = p.total;
     });
 
-    try {
-      await engine.runFullScan({ maxListings, minProfit, minDiscount, minCharmValue, minStickerValue, minAccessoryPct });
-      renderResults();
-
-      // After regular scan, also check Steam for cheap knives/gloves
-      if (snipKnifeScan && statusEl) {
-        statusEl.textContent = '🔪 Buscando cuchillos/guantes baratos en Steam...';
-        await runKnifeGloveScan((msg) => {
-          if (statusEl) statusEl.textContent = msg;
-        });
-      }
-
-      if (statusEl) statusEl.textContent = `✅ ${engine.opportunities.length} oportunidades`;
-      if (progressFill) progressFill.style.width = '100%';
-
-      if (engine.opportunities.length === 0) {
-        if (container) container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">😕</span><h3>Sin oportunidades</h3><p>No se encontraron en este lote. Probá con más listings o ajustá los filtros.</p></div>';
-        showToast('😕 Sin oportunidades', 'info');
-      } else {
-        showToast(`🔍 ${engine.opportunities.length} oportunidades encontradas`, 'success');
-      }
-      if (typeof window.renderHistoricalTop5 === 'function') window.renderHistoricalTop5();
-    } catch (e) {
-      if (statusEl) statusEl.textContent = `❌ Error: ${e.message}`;
-      if (container) container.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">❌</span><h3>Error</h3><p>${e.message}</p></div>`;
-      showToast(`❌ Error: ${e.message}`, 'error');
-    }
-
-    if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
-    if (scanBtn) { scanBtn.textContent = '🔍 Escanear'; scanBtn.classList.remove('scanning'); }
+    return { options, statusEl, progressFill, scanCounter, scanTotal, scanTimer, container, source, scanBtn, progress };
   }
 
-  function stopScan() { if (engine) { engine.stopScan(); showToast('⏹️ Deteniendo...', 'warning'); } }
+  /** Restaurar solo el botón que estaba escaneando */
+  function _scanCleanup(ctx) {
+    if (scanTimerInterval) { clearInterval(scanTimerInterval); scanTimerInterval = null; }
+    if (ctx.scanBtn) {
+      ctx.scanBtn.innerHTML = ctx.scanBtn._originalHTML || 'Escanear';
+      ctx.scanBtn.classList.remove('scanning');
+      delete ctx.scanBtn._originalHTML;
+    }
+    currentScanSource = null;
+  }
+
+  /** Render final scan results + update stats */
+  function _scanComplete(ctx) {
+    renderResults();
+    if (ctx.statusEl) ctx.statusEl.textContent = `✅ ${engine.opportunities.length} oportunidades`;
+    if (ctx.progressFill) ctx.progressFill.style.width = '100%';
+
+    if (engine.opportunities.length === 0) {
+      if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">😕</span><h3>Sin oportunidades</h3><p>No se encontraron en este lote. Probá con más listings o ajustá los filtros.</p></div>';
+      showToast('😕 Sin oportunidades', 'info');
+    } else {
+      showToast(`🔍 ${engine.opportunities.length} oportunidades encontradas`, 'success');
+    }
+    if (typeof window.renderHistoricalTop5 === 'function') window.renderHistoricalTop5();
+  }
+
+  /** Handle scan error */
+  function _scanError(ctx, e) {
+    if (ctx.statusEl) ctx.statusEl.textContent = `❌ Error: ${e.message}`;
+    if (ctx.container) ctx.container.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">❌</span><h3>Error</h3><p>${e.message}</p></div>`;
+    showToast(`❌ Error: ${e.message}`, 'error');
+  }
+
+  // ======================================================================
+  // SCAN: CSFloat — busca listings en CSFloat y los analiza cross-market
+  // ======================================================================
+  async function startScanCs() {
+    const ctx = _scanSetup('csfloat');
+    if (!ctx) return;
+
+    if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">🟠</span><h3>Escaneando CSFloat...</h3><p>Obteniendo listings de CSFloat Market</p></div>';
+
+    try {
+      // Run CSFloat scan (the main cross-market analysis)
+      await engine.runFullScan(ctx.options);
+      _scanComplete(ctx);
+    } catch (e) {
+      _scanError(ctx, e);
+    } finally {
+      _scanCleanup(ctx);
+    }
+  }
+
+  // ======================================================================
+  // SCAN: Steam — Fase 1: cuchillos/guantes < $20. Fase 2: charms en CSFloat
+  // ======================================================================
+  async function startScanSteam() {
+    const ctx = _scanSetup('steam');
+    if (!ctx) return;
+
+    if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">🟦</span><h3>Escaneando Steam Market...</h3><p>Buscando oportunidades en Steam</p></div>';
+
+    try {
+      // ==================================================================
+      // FASE 1: Cuchillos y guantes baratos en Steam (< $20)
+      // ==================================================================
+      if (ctx.statusEl) ctx.statusEl.textContent = '🔪 Buscando cuchillos/guantes < $20 en Steam...';
+
+      const maxKnifePrice = parseFloat(document.getElementById('snipKnifeMaxPrice')?.value || '20');
+      const knifeFound = await scanSteamForKnivesGloves(maxKnifePrice);
+
+      let knifeAlertShown = false;
+      if (knifeFound) {
+        showKnifeGloveAlert(knifeFound);
+        showToast(`🔪 ¡SNIPER! ${knifeFound.name} — $${knifeFound.price.toFixed(2)} en Steam`, 'success');
+        knifeAlertShown = true;
+
+        // Also add as an opportunity in the results
+        if (engine) {
+          if (!engine.opportunities) engine.opportunities = [];
+          engine.opportunities.push({
+            id: 'knife_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            market: 'Steam',
+            marketName: knifeFound.name,
+            listedPrice: knifeFound.price,
+            realValue: knifeFound.price * 1.3, // estimated real value (~30% above listed)
+            skinValue: knifeFound.price,
+            charmValue: 0,
+            stickerValue: 0,
+            accessoryPct: 0,
+            charms: [],
+            stickers: [],
+            discountPct: Math.round(((knifeFound.price * 1.3 - knifeFound.price) / (knifeFound.price * 1.3)) * 100),
+            skinOnlyDiscount: 0,
+            netProfit: Math.round(knifeFound.price * 0.3 * 100) / 100,
+            netProfitWhole: Math.round(knifeFound.price * 0.3 * 100) / 100,
+            netProfitSeparate: 0,
+            profitPct: 30,
+            opportunityScore: 0,
+            confidence: 85,
+            bestStrategy: 'whole',
+            skinLiquidity: 90,
+            skinVolume: knifeFound.listings || 1,
+            isCharmOpportunity: false,
+            isStickerOpportunity: false,
+            isMispriced: true,
+            isDirectMispriced: true,
+            isCrossMispriced: false,
+            crossMarket: null,
+            uncertainItems: null,
+            timeDetected: Date.now(),
+            csfloatUrl: `https://csfloat.com/search?q=${encodeURIComponent(knifeFound.name)}`,
+            steamUrl: knifeFound.steamUrl,
+            float: null,
+          });
+        }
+      } else {
+        showToast('😕 Sin cuchillos/guantes bajo $' + maxKnifePrice.toFixed(2) + ' en Steam', 'info');
+      }
+
+      // ==================================================================
+      // FASE 2: Buscar items en Steam Market y comparar con CSFloat
+      // Busca en Steam via search/render API, cruza con price-list de CSFloat
+      // ==================================================================
+      if (ctx.statusEl) ctx.statusEl.textContent = '📡 Obteniendo price-list de CSFloat...';
+      const maxSteamItems = Math.min(ctx.options.maxListings, 80);
+      const steamOpportunities = [];
+
+      // Obtener price-list de CSFloat (1 llamada liviana, no paginada)
+      let csfloatPriceList = [];
+      try {
+        const resp = await fetch('https://csfloat.com/api/v1/listings/price-list', {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://csfloat.com/',
+          }
+        });
+        if (resp.ok) csfloatPriceList = await resp.json();
+      } catch (e) {}
+
+      if (csfloatPriceList.length === 0) {
+        if (ctx.statusEl) ctx.statusEl.textContent = '❌ No se pudo obtener price-list de CSFloat. Sin datos para comparar.';
+        showToast('❌ No se pudo obtener price-list de CSFloat', 'error');
+        // Continuar igual, solo se va a comparar con los items que existan en CSFloat
+      }
+
+      if (ctx.statusEl) ctx.statusEl.textContent = '🔍 Buscando items en Steam Market...';
+      const STEAM_SEARCH_URL = 'https://steamcommunity.com/market/search/render/';
+      const seenNames = new Set();
+      let allSteamItems = [];
+
+      // Búsqueda por queries variadas para obtener distintos tipos de items
+      const searchQueries = ['★', 'Sticker', 'Case', 'Souvenir', 'StatTrak', 'Gloves', 'Charm'];
+
+      for (const query of searchQueries) {
+        if (!engine.scanning || allSteamItems.length >= maxSteamItems) break;
+        try {
+          const url = `${STEAM_SEARCH_URL}?query=${encodeURIComponent(query)}&start=0&count=50&sort_column=quantity&sort_dir=desc&appid=730&norender=1`;
+          const resp = await fetch(url, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://steamcommunity.com/market/',
+              'Origin': 'https://steamcommunity.com',
+            }
+          });
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          if (!data.success || !data.results) continue;
+
+          for (const r of data.results) {
+            const name = r.hash_name || r.name || '';
+            const priceCents = r.sell_price;
+            if (!name || !priceCents || priceCents <= 0) continue;
+            if (seenNames.has(name)) continue;
+            seenNames.add(name);
+
+            allSteamItems.push({
+              marketName: name,
+              steamPrice: priceCents / 100,
+              volume: r.sell_listings || 0,
+              steamUrl: `https://steamcommunity.com/market/listings/730/${encodeURIComponent(name)}`,
+              csfloatUrl: `https://csfloat.com/search?q=${encodeURIComponent(name)}`,
+            });
+            if (allSteamItems.length >= maxSteamItems) break;
+          }
+          await new Promise(r => setTimeout(r, 800));
+        } catch (e) {}
+      }
+
+      if (ctx.statusEl) ctx.statusEl.textContent = `📦 ${allSteamItems.length} items en Steam. Comparando con CSFloat...`;
+      if (ctx.scanTotal) ctx.scanTotal.textContent = allSteamItems.length;
+
+      // Analizar cada item: comparar precio Steam vs CSFloat
+      const BATCH_STEAM = 5;
+      for (let i = 0; i < allSteamItems.length && engine.scanning; i += BATCH_STEAM) {
+        const batch = allSteamItems.slice(i, i + BATCH_STEAM);
+        const progress = Math.min(i + batch.length, allSteamItems.length);
+
+        if (ctx.statusEl) {
+          ctx.statusEl.textContent = `🔎 Comparando ${progress}/${allSteamItems.length} items en Steam...`;
+        }
+        if (ctx.scanCounter) ctx.scanCounter.textContent = progress;
+
+        for (const item of batch) {
+          if (!engine.scanning) break;
+
+          const { marketName, steamPrice, volume, steamUrl, csfloatUrl } = item;
+
+          // Buscar el precio en CSFloat desde la price-list
+          let csfloatPrice = null;
+          if (csfloatPriceList.length > 0) {
+            const match = csfloatPriceList.find(p => p.market_hash_name === marketName);
+            if (match && match.min_price) csfloatPrice = match.min_price / 100;
+          }
+
+          // Si no tenemos precio de CSFloat, descartamos el item
+          if (csfloatPrice === null) continue;
+
+          // Calcular profit cross-market
+          const steamFee = 0.15;
+          const csfloatFee = 0.02;
+          const netFromSteamSell = steamPrice * (1 - steamFee);
+          const netFromCsfloatSell = csfloatPrice * (1 - csfloatFee);
+
+          // Escenario 1: Comprar en Steam, vender en CSFloat
+          const profitSteamToCs = netFromCsfloatSell - steamPrice;
+          // Escenario 2: Comprar en CSFloat, vender en Steam
+          const profitCsToSteam = netFromSteamSell - csfloatPrice;
+
+          const bestNetProfit = Math.max(profitSteamToCs, profitCsToSteam);
+          if (bestNetProfit < ctx.options.minProfit) continue;
+
+          const buyMarket = profitSteamToCs > profitCsToSteam ? 'Steam' : 'CSFloat';
+          const sellMarket = buyMarket === 'Steam' ? 'CSFloat' : 'Steam';
+          const buyPrice = buyMarket === 'Steam' ? steamPrice : csfloatPrice;
+          const avgPrice = (steamPrice + csfloatPrice) / 2;
+
+          const discountPct = avgPrice > 0 ? ((Math.max(steamPrice, csfloatPrice) - Math.min(steamPrice, csfloatPrice)) / avgPrice) * 100 : 0;
+          if (discountPct < ctx.options.minDiscount) continue;
+
+          const profitPct = buyPrice > 0 ? (bestNetProfit / buyPrice) * 100 : 0;
+          const liquidity = _calcLiquidity(volume || 0);
+
+          const oppScoreParams = {
+            discountPct,
+            netProfit: bestNetProfit,
+            profitPct,
+            skinLiquidity: liquidity,
+            totalCharmValue: 0,
+            totalStickerValue: 0,
+            accessoryPct: 0,
+            hasCharms: false,
+            hasStickers: false,
+            skinVolume: volume || 0,
+            isMispriced: true,
+            isDirectMispriced: true,
+            isCrossMispriced: true,
+            crossProfit: bestNetProfit,
+            confidence: volume > 50 ? 80 : volume > 10 ? 60 : 40,
+            skinOnlyDiscount: discountPct,
+          };
+
+          const score = Math.round(engine._calcOpportunityScore(oppScoreParams));
+
+          steamOpportunities.push({
+            id: 'steam_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            market: 'Steam',
+            marketName,
+            listedPrice: steamPrice,
+            realValue: avgPrice,
+            skinValue: avgPrice,
+            charmValue: 0,
+            stickerValue: 0,
+            accessoryPct: 0,
+            charms: [],
+            stickers: [],
+            discountPct: Math.round(discountPct * 10) / 10,
+            skinOnlyDiscount: Math.round(discountPct * 10) / 10,
+            netProfit: Math.round(bestNetProfit * 100) / 100,
+            netProfitWhole: Math.round(bestNetProfit * 100) / 100,
+            netProfitSeparate: 0,
+            profitPct: Math.round(profitPct * 10) / 10,
+            opportunityScore: score,
+            confidence: volume > 50 ? 80 : volume > 10 ? 60 : 40,
+            bestStrategy: 'cross-market',
+            skinLiquidity: liquidity,
+            skinVolume: volume || 0,
+            isCharmOpportunity: false,
+            isStickerOpportunity: false,
+            isMispriced: true,
+            isDirectMispriced: true,
+            isCrossMispriced: true,
+            crossMarket: {
+              steamPrice,
+              csfloatPrice,
+              avgPrice,
+              bestBuy: { market: buyMarket, price: buyPrice },
+              bestSell: { market: sellMarket, price: sellMarket === 'Steam' ? netFromSteamSell : netFromCsfloatSell },
+              crossProfit: bestNetProfit,
+              buyRecommendation: buyMarket,
+              sellRecommendation: sellMarket,
+            },
+            uncertainItems: null,
+            timeDetected: Date.now(),
+            csfloatUrl,
+            steamUrl,
+            float: null,
+          });
+        }
+
+        if (i + BATCH_STEAM < allSteamItems.length && engine.scanning) {
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+
+      // Ordenar por score
+      steamOpportunities.sort((a, b) => b.opportunityScore - a.opportunityScore);
+
+      // Combinar cuchillo + oportunidades Steam
+      if (engine) {
+        if (!engine.opportunities) engine.opportunities = [];
+        engine.opportunities = [...engine.opportunities, ...steamOpportunities];
+        engine.opportunities.sort((a, b) => b.opportunityScore - a.opportunityScore);
+        engine.saveToHistory();
+      }
+
+      if (ctx.scanCounter) ctx.scanCounter.textContent = engine.opportunities.length;
+      if (ctx.scanTotal) ctx.scanTotal.textContent = engine.opportunities.length;
+
+      _scanComplete(ctx);
+
+    } catch (e) {
+      _scanError(ctx, e);
+    } finally {
+      _scanCleanup(ctx);
+    }
+  }
+
+  function stopScan() { 
+    if (engine) { 
+      engine.stopScan(); 
+      showToast('⏹️ Deteniendo...', 'warning'); 
+    }
+  }
 
   function toggleAlerts() {
     alertsEnabled = !alertsEnabled;
@@ -1312,6 +1666,60 @@
     }).join('');
   }
 
+  // ======================================================================
+  // AUTO STEAM SNIPER — revisa Steam automáticamente sin apretar Escanear
+  // ======================================================================
+  let steamSniperAutoTimer = null;
+  let steamSniperAutoTimeout = null;
+
+  /**
+   * Start automatic Steam Sniper polling.
+   * Checks for cheap knives/gloves on Steam every ~60s.
+   * Solo si el checkbox snipKnifeScan está marcado.
+   */
+  function startSteamSniperAutoScan() {
+    stopSteamSniperAutoScan();
+
+    // First check after 2s (give the page time to init)
+    steamSniperAutoTimeout = setTimeout(() => doAutoScan(), 2000);
+
+    // Then every 60s
+    steamSniperAutoTimer = setInterval(doAutoScan, 60000);
+  }
+
+  function stopSteamSniperAutoScan() {
+    if (steamSniperAutoTimeout) {
+      clearTimeout(steamSniperAutoTimeout);
+      steamSniperAutoTimeout = null;
+    }
+    if (steamSniperAutoTimer) {
+      clearInterval(steamSniperAutoTimer);
+      steamSniperAutoTimer = null;
+    }
+  }
+
+  /** Internal: do one auto-scan cycle */
+  async function doAutoScan() {
+    // Only run in sniper mode
+    const sniperCol = document.querySelector('.sniper-col');
+    if (!sniperCol || !sniperCol.classList.contains('active')) return;
+
+    // Only run if checkbox is checked
+    const knifeCheck = document.getElementById('snipKnifeScan');
+    if (!knifeCheck || !knifeCheck.checked) return;
+
+    // Don't spam if the overlay is already showing
+    const overlay = document.getElementById('steamSniperOverlay');
+    if (overlay && overlay.classList.contains('show')) return;
+
+    const maxPrice = parseFloat(document.getElementById('snipKnifeMaxPrice')?.value || '20');
+    const found = await scanSteamForKnivesGloves(maxPrice);
+    if (!found) return; // Silent — no toast on auto-scan
+
+    showKnifeGloveAlert(found);
+    showToast(`🔪 ¡SNIPER! ${found.name} — $${found.price.toFixed(2)} en Steam`, 'success');
+  }
+
   // ===== INIT =====
   function initOpportunityEngine() {
     engine = new CrossMarketEngine();
@@ -1323,11 +1731,15 @@
     });
 
     renderResults();
+
+    // 🚀 AUTO START Steam Sniper — revisa Steam desde el inicio sin necesidad de Escanear
+    startSteamSniperAutoScan();
   }
 
   // Event delegation
   document.addEventListener('click', (e) => {
-    if (e.target.closest('#snipScanBtn')) { startScan(); return; }
+    if (e.target.closest('#snipScanCsBtn')) { startScanCs(); return; }
+    if (e.target.closest('#snipScanSteamBtn')) { startScanSteam(); return; }
     if (e.target.closest('#snipAlertsBtn')) { toggleAlerts(); return; }
 
     if (e.target.closest('#snipHistoryBtn')) {
@@ -1438,10 +1850,13 @@
   // Clean up on page unload
   window.addEventListener('beforeunload', () => {
     if (engine) engine.stopPolling();
+    stopSteamSniperAutoScan();
   });
 
   // Expose for init.js
   window.initOpportunityEngine = initOpportunityEngine;
   window.renderOpportunityResults = renderResults;
   window.renderOpportunityHistory = renderHistory;
+  window.startSteamSniperAutoScan = startSteamSniperAutoScan;
+  window.stopSteamSniperAutoScan = stopSteamSniperAutoScan;
 })();
