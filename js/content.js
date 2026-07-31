@@ -228,7 +228,28 @@
     setInterval(processListings, 10000);
   }
 
-  chrome.runtime.onMessage.addListener((request) => {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Puente de API: ejecuta fetch same-origin desde csfloat.com.
+    // La API de listings exige sesión logueada (cookie del navegador),
+    // y este fetch corre dentro de la página con la sesión activa.
+    if (request.action === 'csfloatFetch') {
+      if (!contextValid) { sendResponse({ ok: false, error: 'context invalid' }); return; }
+      try {
+        fetch(request.url, { credentials: 'same-origin' })
+          .then(async (resp) => {
+            const text = await resp.text();
+            sendResponse({ ok: resp.ok, status: resp.status, body: text });
+          })
+          .catch((e) => {
+            sendResponse({ ok: false, status: 0, body: '', error: String(e && e.message || e) });
+          });
+        return true; // respuesta async
+      } catch (e) {
+        sendResponse({ ok: false, status: 0, body: '', error: String(e && e.message || e) });
+        return true;
+      }
+    }
+
     if (request.action === 'configUpdated') {
       loadConfig().then(() => {
         addGlobalIndicator();

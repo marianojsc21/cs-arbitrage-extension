@@ -11,6 +11,7 @@ const FILES_TO_UPDATE = [
   'js/history-io.js',
   'js/init.js',
   'js/storage.js',
+  'js/csfloat.js',
   'js/loader.js',
   'js/content.js',
   'js/popup.js',

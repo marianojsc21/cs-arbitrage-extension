@@ -173,66 +173,40 @@
 
     async fetchListings(options = {}) {
       const { maxListings = 100 } = options;
+      // Delegado al cliente centralizado (API key + cola global anti-bloqueo).
+      // El cliente maneja paginación, backoff 429 y caché compartida.
+      if (window.CSFloatClient && typeof window.CSFloatClient.fetchListings === 'function') {
+        return await window.CSFloatClient.fetchListings(maxListings);
+      }
+      // Fallback directo si el cliente no está cargado
       const listings = [];
       let cursor = null;
       let fetched = 0;
-      let retries = 0;
-      const MAX_RETRIES = 5;
       const BATCH_SIZE = 10;
 
       while (fetched < maxListings) {
         let url = `${CSFLOAT_LISTINGS_API}?limit=${BATCH_SIZE}&types=buy_now`;
         if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
-        try {
-          const resp = await fetch(url, {
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Referer': 'https://csfloat.com/',
-              'Origin': 'https://csfloat.com',
-            }
-          });
-
-          // Handle rate limiting (429) with exponential backoff
-          if (resp.status === 429) {
-            if (retries >= MAX_RETRIES) {
-              let errorBody = '';
-              try { errorBody = await resp.text(); } catch(e) {}
-              throw new Error(`CSFloat rate limit: ${errorBody.slice(0,200)}`);
-            }
-            const waitMs = Math.min(12000 * Math.pow(2, retries), 45000);
-            retries++;
-            await new Promise(r => setTimeout(r, waitMs));
-            continue;
-          }
-
-          if (!resp.ok) {
-            let errorBody = '';
-            try { errorBody = await resp.text(); } catch(e) {}
-            throw new Error(`CSFloat error: ${resp.status} - ${errorBody.slice(0,200)}`);
-          }
-
-          retries = 0;
-          const data = await resp.json();
-          const batch = data.data || data || [];
-          if (!batch.length) break;
-          for (const l of batch) {
-            if (l.type && l.type !== 'purchase') continue;
-            if (l.state && l.state !== 'published') continue;
-            listings.push(l);
-            fetched++;
-            if (fetched >= maxListings) break;
-          }
-          cursor = data.cursor || data.next_cursor || null;
-          if (!cursor && batch.length < BATCH_SIZE) break;
-          // Wait 5-8s between batches
-          await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
-        } catch (e) {
-          if (e.message.includes('rate limit') || e.message.includes('429')) {
-            throw e;
-          }
-          throw e;
+        const resp = await fetch(url);
+        if (resp.status === 429) {
+          if (cursor || fetched > 0) break;
+          await new Promise(r => setTimeout(r, 12000));
+          continue;
         }
+        if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
+        const data = await resp.json();
+        const batch = data.data || data || [];
+        if (!batch.length) break;
+        for (const l of batch) {
+          if (l.type && l.type !== 'purchase') continue;
+          if (l.state && l.state !== 'published') continue;
+          listings.push(l);
+          fetched++;
+          if (fetched >= maxListings) break;
+        }
+        cursor = data.cursor || data.next_cursor || null;
+        if (!cursor && batch.length < BATCH_SIZE) break;
+        await new Promise(r => setTimeout(r, 5000 + Math.random() * 3000));
       }
       return listings;
     }
@@ -335,11 +309,13 @@
       let csfloatPrice = null;
       try {
         // CSFloat price-list is an array, not per-item lookup
-        // We use the price-list endpoint for batch data
+        // Centralizado: key + caché 30 min + cola (evita rate limits)
         if (!this._csfloatPriceList) {
-          const resp = await fetch(CSFLOAT_PRICE_API);
-          if (resp.ok) {
-            this._csfloatPriceList = await resp.json();
+          if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
+            this._csfloatPriceList = await window.CSFloatClient.getPriceList();
+          } else {
+            const resp = await fetch(CSFLOAT_PRICE_API);
+            if (resp.ok) this._csfloatPriceList = await resp.json();
           }
         }
         if (this._csfloatPriceList) {
@@ -808,6 +784,7 @@
           isDirectMispriced: o.isDirectMispriced,
           isCrossMispriced: o.isCrossMispriced,
           skinOnlyDiscount: o.skinOnlyDiscount,
+          charmBeatsSkin: o.charmBeatsSkin,
           csfloatUrl: o.csfloatUrl,
           steamUrl: o.steamUrl,
           uncertainItems: o.uncertainItems,
@@ -1106,7 +1083,11 @@
 
       // Opportunity type badge (always shown)
       let typeBadge = '';
-      if (opp.isCharmOpportunity && opp.isStickerOpportunity) {
+      if (opp.isSteamSniper) {
+        typeBadge = '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.5rem;font-weight:700;background:rgba(255,51,102,0.15);color:var(--profit-red);margin-left:4px">🔪 Sniper</span>';
+      } else if (opp.charmBeatsSkin) {
+        typeBadge = '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.5rem;font-weight:700;background:rgba(255,107,53,0.18);color:var(--accent-1);margin-left:4px">⭐ Charm > Skin</span>';
+      } else if (opp.isCharmOpportunity && opp.isStickerOpportunity) {
         typeBadge = '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.5rem;font-weight:700;background:rgba(0,212,170,0.12);color:var(--profit-green);margin-left:4px">🧩 Charm+Sticker</span>';
       } else if (opp.isCharmOpportunity) {
         typeBadge = '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.5rem;font-weight:700;background:rgba(0,212,170,0.12);color:var(--profit-green);margin-left:4px">🔑 Charm</span>';
@@ -1334,7 +1315,7 @@
   }
 
   // ======================================================================
-  // SCAN: Steam — Fase 1: cuchillos/guantes < $20. Fase 2: charms en CSFloat
+  // SCAN: Steam — Fase 1: cuchillos/guantes < $20. Fase 2: charm arbitrage (vender por separado en Steam)
   // ======================================================================
   async function startScanSteam() {
     const ctx = _scanSetup('steam');
@@ -1357,7 +1338,8 @@
         showToast(`🔪 ¡SNIPER! ${knifeFound.name} — $${knifeFound.price.toFixed(2)} en Steam`, 'success');
         knifeAlertShown = true;
 
-        // Also add as an opportunity in the results
+        // Also add as an opportunity in the results (SIN profit inventado:
+        // el valor real del cuchillo no lo calculamos, solo marcamos la alerta)
         if (engine) {
           if (!engine.opportunities) engine.opportunities = [];
           engine.opportunities.push({
@@ -1365,19 +1347,19 @@
             market: 'Steam',
             marketName: knifeFound.name,
             listedPrice: knifeFound.price,
-            realValue: knifeFound.price * 1.3, // estimated real value (~30% above listed)
+            realValue: knifeFound.price,
             skinValue: knifeFound.price,
             charmValue: 0,
             stickerValue: 0,
             accessoryPct: 0,
             charms: [],
             stickers: [],
-            discountPct: Math.round(((knifeFound.price * 1.3 - knifeFound.price) / (knifeFound.price * 1.3)) * 100),
+            discountPct: 0,
             skinOnlyDiscount: 0,
-            netProfit: Math.round(knifeFound.price * 0.3 * 100) / 100,
-            netProfitWhole: Math.round(knifeFound.price * 0.3 * 100) / 100,
+            netProfit: 0,
+            netProfitWhole: 0,
             netProfitSeparate: 0,
-            profitPct: 30,
+            profitPct: 0,
             opportunityScore: 0,
             confidence: 85,
             bestStrategy: 'whole',
@@ -1388,6 +1370,7 @@
             isMispriced: true,
             isDirectMispriced: true,
             isCrossMispriced: false,
+            isSteamSniper: true, // tarjeta informativa: la alerta roja es lo principal
             crossMarket: null,
             uncertainItems: null,
             timeDetected: Date.now(),
@@ -1401,199 +1384,80 @@
       }
 
       // ==================================================================
-      // FASE 2: Buscar items en Steam Market y comparar con CSFloat
-      // Busca en Steam via search/render API, cruza con price-list de CSFloat
+      // FASE 2: CHARM ARBITRAGE — skins con charms/stickers equipados
+      // Estrategia 100% Steam: comprar una skin+charm barata (publicada sin
+      // valorar el accesorio) y vender skin y charm POR SEPARADO en Steam.
+      // El dato de charms equipados solo existe en los listings de CSFloat
+      // (Steam no lo expone en su API de búsqueda), por eso se leen los
+      // listings de CSFloat con caché, pero la ganancia se calcula con
+      // precios reales de Steam para cada componente.
       // ==================================================================
-      if (ctx.statusEl) ctx.statusEl.textContent = '📡 Obteniendo price-list de CSFloat...';
-      const maxSteamItems = Math.min(ctx.options.maxListings, 80);
+      if (ctx.statusEl) ctx.statusEl.textContent = '🔑 Buscando skins con charms/stickers equipados...';
       const steamOpportunities = [];
 
-      // Obtener price-list de CSFloat (1 llamada liviana, no paginada)
-      let csfloatPriceList = [];
+      // Obtener listings de CSFloat (caché 2 min) y quedarnos SOLO con los
+      // que traen charms o stickers equipados. Una skin = un análisis (el
+      // listing MÁS BARATO con accesorios), para no repetir consultas a Steam.
+      let charmListings = [];
+      let charmError = null;
       try {
-        const resp = await fetch('https://csfloat.com/api/v1/listings/price-list', {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://csfloat.com/',
+        const rawListings = await engine.getCachedListings(Math.min(Math.max(ctx.options.maxListings, 40), 120));
+        const cheapestBySkin = new Map(); // marketName -> listing más barato con accesorios
+        for (const l of rawListings) {
+          const parsed = engine.csfloatProvider.parseListing(l);
+          if (!parsed || !parsed.marketName) continue;
+          const hasAcc = (parsed.charms && parsed.charms.length > 0) || (parsed.regularStickers && parsed.regularStickers.length > 0);
+          if (!hasAcc) continue;
+          const current = cheapestBySkin.get(parsed.marketName);
+          if (!current || parsed.listedPrice < current.listedPrice) {
+            cheapestBySkin.set(parsed.marketName, parsed);
           }
-        });
-        if (resp.ok) csfloatPriceList = await resp.json();
-      } catch (e) {}
-
-      if (csfloatPriceList.length === 0) {
-        if (ctx.statusEl) ctx.statusEl.textContent = '❌ No se pudo obtener price-list de CSFloat. Sin datos para comparar.';
-        showToast('❌ No se pudo obtener price-list de CSFloat', 'error');
-        // Continuar igual, solo se va a comparar con los items que existan en CSFloat
+        }
+        charmListings = Array.from(cheapestBySkin.values());
+      } catch (e) {
+        charmError = e && e.message ? e.message : String(e);
+        console.warn('Steam scan: sin listings CSFloat para charm arbitrage', charmError);
       }
 
-      if (ctx.statusEl) ctx.statusEl.textContent = '🔍 Buscando items en Steam Market...';
-      const STEAM_SEARCH_URL = 'https://steamcommunity.com/market/search/render/';
-      const seenNames = new Set();
-      let allSteamItems = [];
-
-      // Búsqueda por queries variadas para obtener distintos tipos de items
-      const searchQueries = ['★', 'Sticker', 'Case', 'Souvenir', 'StatTrak', 'Gloves', 'Charm'];
-
-      for (const query of searchQueries) {
-        if (!engine.scanning || allSteamItems.length >= maxSteamItems) break;
-        try {
-          const url = `${STEAM_SEARCH_URL}?query=${encodeURIComponent(query)}&start=0&count=50&sort_column=quantity&sort_dir=desc&appid=730&norender=1`;
-          const resp = await fetch(url, {
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Referer': 'https://steamcommunity.com/market/',
-              'Origin': 'https://steamcommunity.com',
-            }
-          });
-          if (!resp.ok) continue;
-          const data = await resp.json();
-          if (!data.success || !data.results) continue;
-
-          for (const r of data.results) {
-            const name = r.hash_name || r.name || '';
-            const priceCents = r.sell_price;
-            if (!name || !priceCents || priceCents <= 0) continue;
-            if (seenNames.has(name)) continue;
-            seenNames.add(name);
-
-            allSteamItems.push({
-              marketName: name,
-              steamPrice: priceCents / 100,
-              volume: r.sell_listings || 0,
-              steamUrl: `https://steamcommunity.com/market/listings/730/${encodeURIComponent(name)}`,
-              csfloatUrl: `https://csfloat.com/search?q=${encodeURIComponent(name)}`,
-            });
-            if (allSteamItems.length >= maxSteamItems) break;
-          }
-          await new Promise(r => setTimeout(r, 800));
-        } catch (e) {}
+      if (ctx.scanTotal) ctx.scanTotal.textContent = charmListings.length;
+      if (ctx.statusEl && charmListings.length === 0) {
+        // Mostrar el error real (ej: 403 = falta sesión) en vez de un 0/0 silencioso
+        if (charmError && charmError.includes('403')) {
+          ctx.statusEl.textContent = '❌ La API de listings exige sesión: abrí csfloat.com (logueado) en una pestaña y reintentá.';
+          showToast('❌ Abrí csfloat.com en una pestaña para escanear charms', 'error');
+        } else if (charmError) {
+          ctx.statusEl.textContent = `❌ No se obtuvieron listings: ${charmError}`;
+        } else {
+          ctx.statusEl.textContent = 'ℹ️ Sin listings con charms/stickers en este lote. Probá con más listings o más tarde.';
+        }
       }
 
-      if (ctx.statusEl) ctx.statusEl.textContent = `📦 ${allSteamItems.length} items en Steam. Comparando con CSFloat...`;
-      if (ctx.scanTotal) ctx.scanTotal.textContent = allSteamItems.length;
-
-      // Analizar cada item: comparar precio Steam vs CSFloat
-      const BATCH_STEAM = 5;
-      for (let i = 0; i < allSteamItems.length && engine.scanning; i += BATCH_STEAM) {
-        const batch = allSteamItems.slice(i, i + BATCH_STEAM);
-        const progress = Math.min(i + batch.length, allSteamItems.length);
+      // Analizar cada skin con charms usando el motor (precios Steam + score)
+      const BATCH_CHARM = 4;
+      for (let i = 0; i < charmListings.length && engine.scanning; i += BATCH_CHARM) {
+        const batch = charmListings.slice(i, i + BATCH_CHARM);
+        const progress = Math.min(i + batch.length, charmListings.length);
 
         if (ctx.statusEl) {
-          ctx.statusEl.textContent = `🔎 Comparando ${progress}/${allSteamItems.length} items en Steam...`;
+          ctx.statusEl.textContent = `🔎 Analizando ${progress}/${charmListings.length} skins con charms...`;
         }
         if (ctx.scanCounter) ctx.scanCounter.textContent = progress;
 
-        for (const item of batch) {
-          if (!engine.scanning) break;
-
-          const { marketName, steamPrice, volume, steamUrl, csfloatUrl } = item;
-
-          // Buscar el precio en CSFloat desde la price-list
-          let csfloatPrice = null;
-          if (csfloatPriceList.length > 0) {
-            const match = csfloatPriceList.find(p => p.market_hash_name === marketName);
-            if (match && match.min_price) csfloatPrice = match.min_price / 100;
-          }
-
-          // Si no tenemos precio de CSFloat, descartamos el item
-          if (csfloatPrice === null) continue;
-
-          // Calcular profit cross-market
-          const steamFee = 0.15;
-          const csfloatFee = 0.02;
-          const netFromSteamSell = steamPrice * (1 - steamFee);
-          const netFromCsfloatSell = csfloatPrice * (1 - csfloatFee);
-
-          // Escenario 1: Comprar en Steam, vender en CSFloat
-          const profitSteamToCs = netFromCsfloatSell - steamPrice;
-          // Escenario 2: Comprar en CSFloat, vender en Steam
-          const profitCsToSteam = netFromSteamSell - csfloatPrice;
-
-          const bestNetProfit = Math.max(profitSteamToCs, profitCsToSteam);
-          if (bestNetProfit < ctx.options.minProfit) continue;
-
-          const buyMarket = profitSteamToCs > profitCsToSteam ? 'Steam' : 'CSFloat';
-          const sellMarket = buyMarket === 'Steam' ? 'CSFloat' : 'Steam';
-          const buyPrice = buyMarket === 'Steam' ? steamPrice : csfloatPrice;
-          const avgPrice = (steamPrice + csfloatPrice) / 2;
-
-          const discountPct = avgPrice > 0 ? ((Math.max(steamPrice, csfloatPrice) - Math.min(steamPrice, csfloatPrice)) / avgPrice) * 100 : 0;
-          if (discountPct < ctx.options.minDiscount) continue;
-
-          const profitPct = buyPrice > 0 ? (bestNetProfit / buyPrice) * 100 : 0;
-          const liquidity = _calcLiquidity(volume || 0);
-
-          const oppScoreParams = {
-            discountPct,
-            netProfit: bestNetProfit,
-            profitPct,
-            skinLiquidity: liquidity,
-            totalCharmValue: 0,
-            totalStickerValue: 0,
-            accessoryPct: 0,
-            hasCharms: false,
-            hasStickers: false,
-            skinVolume: volume || 0,
-            isMispriced: true,
-            isDirectMispriced: true,
-            isCrossMispriced: true,
-            crossProfit: bestNetProfit,
-            confidence: volume > 50 ? 80 : volume > 10 ? 60 : 40,
-            skinOnlyDiscount: discountPct,
-          };
-
-          const score = Math.round(engine._calcOpportunityScore(oppScoreParams));
-
-          steamOpportunities.push({
-            id: 'steam_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-            market: 'Steam',
-            marketName,
-            listedPrice: steamPrice,
-            realValue: avgPrice,
-            skinValue: avgPrice,
-            charmValue: 0,
-            stickerValue: 0,
-            accessoryPct: 0,
-            charms: [],
-            stickers: [],
-            discountPct: Math.round(discountPct * 10) / 10,
-            skinOnlyDiscount: Math.round(discountPct * 10) / 10,
-            netProfit: Math.round(bestNetProfit * 100) / 100,
-            netProfitWhole: Math.round(bestNetProfit * 100) / 100,
-            netProfitSeparate: 0,
-            profitPct: Math.round(profitPct * 10) / 10,
-            opportunityScore: score,
-            confidence: volume > 50 ? 80 : volume > 10 ? 60 : 40,
-            bestStrategy: 'cross-market',
-            skinLiquidity: liquidity,
-            skinVolume: volume || 0,
-            isCharmOpportunity: false,
-            isStickerOpportunity: false,
-            isMispriced: true,
-            isDirectMispriced: true,
-            isCrossMispriced: true,
-            crossMarket: {
-              steamPrice,
-              csfloatPrice,
-              avgPrice,
-              bestBuy: { market: buyMarket, price: buyPrice },
-              bestSell: { market: sellMarket, price: sellMarket === 'Steam' ? netFromSteamSell : netFromCsfloatSell },
-              crossProfit: bestNetProfit,
-              buyRecommendation: buyMarket,
-              sellRecommendation: sellMarket,
-            },
-            uncertainItems: null,
-            timeDetected: Date.now(),
-            csfloatUrl,
-            steamUrl,
-            float: null,
-          });
+        const results = await Promise.all(batch.map(l => engine.analyzeListing(l, ctx.options)));
+        for (const opp of results) {
+          if (!opp) continue;
+          // Solo combinaciones (skin+charm / skin+sticker): lo que busca el modo
+          if (!opp.isCharmOpportunity && !opp.isStickerOpportunity) continue;
+          // Respetar filtros de valor mínimo de accesorios y profit mínimo
+          if (opp.charmValue < ctx.options.minCharmValue && opp.stickerValue < ctx.options.minStickerValue) continue;
+          if (opp.netProfit < ctx.options.minProfit) continue;
+          // ⭐ El charm vale más que la skin → prioridad máxima
+          opp.charmBeatsSkin = opp.charmValue > opp.skinValue;
+          steamOpportunities.push(opp);
         }
 
-        if (i + BATCH_STEAM < allSteamItems.length && engine.scanning) {
-          await new Promise(r => setTimeout(r, 800));
+        if (i + BATCH_CHARM < charmListings.length && engine.scanning) {
+          await new Promise(r => setTimeout(r, 1200));
         }
       }
 

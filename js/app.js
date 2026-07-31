@@ -90,8 +90,12 @@
     return map[cat] || '📦';
   }
 
-  // ===== CSFLOAT API =====
+  // ===== CSFLOAT API (centralizado: key + caché + cola) =====
   async function fetchCSFloatPriceList() {
+    if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
+      return await window.CSFloatClient.getPriceList();
+    }
+    // Fallback si el cliente no está cargado
     const resp = await fetch('https://csfloat.com/api/v1/listings/price-list');
     if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
     return await resp.json();

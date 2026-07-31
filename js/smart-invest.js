@@ -162,9 +162,15 @@
       this._emitProgress(0, 1, '📡 Obteniendo lista de precios de CSFloat...', 'csfloat');
 
       try {
-        const resp = await fetch(CSFLOAT_API);
-        if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
-        const priceList = await resp.json();
+        let priceList;
+        if (window.CSFloatClient && typeof window.CSFloatClient.getPriceList === 'function') {
+          // Centralizado: API key + caché compartida 30 min + cola anti-bloqueo
+          priceList = await window.CSFloatClient.getPriceList();
+        } else {
+          const resp = await fetch(CSFLOAT_API);
+          if (!resp.ok) throw new Error(`CSFloat error: ${resp.status}`);
+          priceList = await resp.json();
+        }
         this.rawPriceList = priceList;
 
         this._emitProgress(0, 1, `📦 ${priceList.length} items obtenidos. Aplicando filtros...`, 'filter');
