@@ -26,7 +26,10 @@
   // Nota: los endpoints de CSFloat (listings y price-list) se acceden SOLO
   // vía window.CSFloatClient (js/csfloat.js): API key + caché compartida +
   // cola anti-bloqueo + puente de sesión. Ya no hay fallback directo.
-  const POLL_INTERVAL_MS = 45000; // 45s between real-time polls
+  // Polling de alertas: 3 min entre ciclos (antes 45s). Cada ciclo corre
+  // runFullScan → más requests a CSFloat/Steam. 3 min mantiene las alertas
+  // "en tiempo real" pero sin martillar las APIs ni arriesgar rate limits.
+  const POLL_INTERVAL_MS = 180000;
 
   // ======================================================================
   // SHARED HELPERS
@@ -208,7 +211,16 @@
       // Cache de listings para compartir entre CSFloat y Steam scans
       this._listingsCache = null;
       this._listingsCacheTime = 0;
-      this._listingsCacheTTL = 120 * 1000; // 2 minutos de cache
+      // Caché de listings: 10 min (antes 2 min). Los listings cambian poco
+      // en 10 min para sniper, y así los escaneos repetidos NO re-consultan
+      // la API de CSFloat (evita el rate limit "too many requests").
+      this._listingsCacheTTL = 600 * 1000;
+      // Cooldown anti-bloqueo: cuando CSFloat responde "too many requests from
+      // too many IPs", la IP ya quedó marcada. Durante este cooldown NO se
+      // vuelve a golpear la API por más que el usuario aprete Escanear: se
+      // devuelve la caché anterior (aunque esté vencida) o un aviso claro.
+      this._rateLimitedUntil = 0;
+      this._servingStale = false; // true cuando los resultados son de caché previa (CSFloat bloqueado)
     }
 
     // ======================================================================
@@ -643,13 +655,36 @@
 
     /** Get cached listings if available, otherwise fetch fresh from CSFloat API */
     async getCachedListings(maxListings) {
-      if (this._listingsCache && Date.now() - this._listingsCacheTime < this._listingsCacheTTL) {
+      const now = Date.now();
+      // Cooldown activo por bloqueo de CSFloat: NO golpear la API.
+      if (this._rateLimitedUntil > now) {
+        // Si tenemos caché anterior (aunque esté vencida), devolverla para que
+        // el escaneo funcione con datos previos en vez de fallar en seco.
+        // Avisar que los resultados son previos (CSFloat bloqueado) para no
+        // confundir con datos frescos a la hora de decidir una compra.
+        this._servingStale = true;
+        if (this._listingsCache) return this._listingsCache;
+        const mins = Math.ceil((this._rateLimitedUntil - now) / 60000);
+        throw new Error(`CSFloat está bloqueando tu IP — esperá ${mins} min antes de escanear.`);
+      }
+      this._servingStale = false;
+      if (this._listingsCache && now - this._listingsCacheTime < this._listingsCacheTTL) {
         return this._listingsCache;
       }
-      const fresh = await this.csfloatProvider.fetchListings({ maxListings });
-      this._listingsCache = fresh;
-      this._listingsCacheTime = Date.now();
-      return fresh;
+      try {
+        const fresh = await this.csfloatProvider.fetchListings({ maxListings });
+        this._listingsCache = fresh;
+        this._listingsCacheTime = Date.now();
+        return fresh;
+      } catch (e) {
+        // Detectar el bloqueo largo de CSFloat y activar el cooldown de 5 min
+        const msg = (e && e.message) || String(e);
+        if (/rate limit|too many|429/i.test(msg)) {
+          this._rateLimitedUntil = Date.now() + 5 * 60 * 1000;
+          this._servingStale = true;
+        }
+        throw e;
+      }
     }
 
     // ======================================================================
@@ -1204,12 +1239,19 @@
   /** Render final scan results + update stats */
   function _scanComplete(ctx) {
     renderResults();
-    if (ctx.statusEl) ctx.statusEl.textContent = `✅ ${engine.opportunities.length} oportunidades`;
+    const stale = engine && engine._servingStale;
+    if (ctx.statusEl) {
+      ctx.statusEl.textContent = stale
+        ? `📂 Datos previos (CSFloat bloqueado) — ${engine.opportunities.length} oportunidades`
+        : `✅ ${engine.opportunities.length} oportunidades`;
+    }
     if (ctx.progressFill) ctx.progressFill.style.width = '100%';
 
     if (engine.opportunities.length === 0) {
       if (ctx.container) ctx.container.innerHTML = '<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">😕</span><h3>Sin oportunidades</h3><p>No se encontraron en este lote. Probá con más listings o ajustá los filtros.</p></div>';
       showToast('😕 Sin oportunidades', 'info');
+    } else if (stale) {
+      showToast('📂 Mostrando datos previos — CSFloat bloqueó tu IP. Esperá unos minutos.', 'warning');
     } else {
       showToast(`🔍 ${engine.opportunities.length} oportunidades encontradas`, 'success');
     }
@@ -1492,8 +1534,8 @@
     // First check after 2s (give the page time to init)
     steamSniperAutoTimeout = setTimeout(() => doAutoScan(), 2000);
 
-    // Then every 60s
-    steamSniperAutoTimer = setInterval(doAutoScan, 60000);
+    // Then every 2 min (antes 60s: 3 búsquedas a Steam por ciclo eran demasiado)
+    steamSniperAutoTimer = setInterval(doAutoScan, 120000);
   }
 
   function stopSteamSniperAutoScan() {
@@ -1520,6 +1562,9 @@
     // Don't spam if the overlay is already showing
     const overlay = document.getElementById('steamSniperOverlay');
     if (overlay && overlay.classList.contains('show')) return;
+
+    // Don't run while a manual scan is in progress (evita peticiones duplicadas)
+    if (engine && engine.scanning) return;
 
     const maxPrice = parseFloat(document.getElementById('snipKnifeMaxPrice')?.value || '20');
     const found = await scanSteamForKnivesGloves(maxPrice);

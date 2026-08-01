@@ -2,6 +2,13 @@ let steamPrices = {};
 let profitMin = 10;
 let enabled = true;
 
+// Cola global para fetchSteamPrice (el content script puede pedir muchos
+// precios a la vez cuando escanea listings en csfloat.com). Sin cola, esas
+// peticiones iban en ráfaga y Steam responde 429 (rate limit).
+let steamQueue = Promise.resolve();
+let lastSteamReqTime = 0;
+const STEAM_GAP_MS = 2500; // ~24 req/min (Steam limita ~20/min)
+
 const GITHUB_RAW = 'https://raw.githubusercontent.com/marianojsc21/cs-arbitrage-extension/main';
 const GITHUB_MANIFEST = GITHUB_RAW + '/manifest.json';
 const FILES_TO_UPDATE = [
@@ -82,7 +89,21 @@ async function fetchSteamPrice(marketName) {
 
   try {
     const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=1&market_hash_name=${encodeURIComponent(marketName)}`;
-    const response = await fetch(url);
+    // Ejecutar dentro de la cola con gap mínimo entre requests
+    const response = await new Promise((resolve, reject) => {
+      const run = async () => {
+        const wait = Math.max(0, STEAM_GAP_MS - (Date.now() - lastSteamReqTime));
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        lastSteamReqTime = Date.now();
+        try {
+          resolve(await fetch(url));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      const p = steamQueue.then(run, run);
+      steamQueue = p.then(() => {}, () => {});
+    });
     const data = await response.json();
 
     let price = null;

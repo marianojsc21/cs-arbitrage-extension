@@ -145,11 +145,15 @@
     };
     if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
 
-    let lastResp = null;
+    let lastBody = '';
     for (let attempt = 0; attempt < 4; attempt++) {
       const resp = await fetch(url, { headers });
       if (resp.status === 429) {
-        lastResp = resp;
+        try { lastBody = await resp.text(); } catch (e) { lastBody = ''; }
+        // Bloqueo LARGO: "too many requests from too many IPs" significa que la
+        // IP ya está marcada — reintentar 2.4 min no sirve y empeora el bloqueo.
+        // Cortamos de inmediato y dejamos que el cooldown de 5 min haga efecto.
+        if (/too many requests from too many IPs/i.test(lastBody)) break;
         const waitMs = Math.min(12000 * Math.pow(2, attempt), 60000);
         await sleep(waitMs);
         continue;
@@ -161,10 +165,8 @@
       }
       return resp;
     }
-    // Se agotaron los reintentos
-    let body = '';
-    try { if (lastResp) body = await lastResp.text(); } catch (e) {}
-    throw new Error(`CSFloat rate limit: ${body.slice(0, 200)}`);
+    // Se agotaron los reintentos (o bloqueo largo detectado)
+    throw new Error(`CSFloat rate limit: ${lastBody.slice(0, 200)}`);
   }
 
   /** Obtiene el price-list con caché compartida (15 min).
@@ -311,7 +313,10 @@
     const limit = Math.max(1, Math.min(parseInt(maxListings, 10) || 100, 500));
     const listings = [];
     let cursor = null;
-    const BATCH_SIZE = 10;
+    // 50 es el límite MÁXIMO que acepta la API de CSFloat por página.
+    // Antes usábamos 10 → 120 listings = 12 requests por escaneo.
+    // Con 50 → 3 requests (4x menos) y mucho menos riesgo de rate limit.
+    const BATCH_SIZE = 50;
     let fetched = 0;
 
     while (fetched < limit) {

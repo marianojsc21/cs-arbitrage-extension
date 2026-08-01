@@ -5,6 +5,10 @@
   let processedListings = new Set();
   let observer = null;
   let contextValid = true;
+  // Guard anti-concurrencia: si un ciclo de processListings sigue corriendo
+  // (el observer + el intervalo lo disparan seguido en páginas con mucho
+  // DOM), NO se lanza otro en paralelo. Evita ráfagas de requests.
+  let processingListings = false;
 
   // Wrapper seguro para chrome.runtime.sendMessage que maneja "Extension context invalidated"
   function safeSendMessage(msg) {
@@ -138,60 +142,66 @@
 
   async function processListings() {
     if (!config.enabled || !contextValid) return;
+    if (processingListings) return; // nunca 2 ciclos en paralelo
+    processingListings = true;
 
-    const BATCH_SIZE = 5;
-    const STAGGER_MS = 300;
-    const BATCH_DELAY_MS = 2500;
+    try {
+      const BATCH_SIZE = 5;
+      const STAGGER_MS = 400;
+      const BATCH_DELAY_MS = 3000;
 
-    const listings = findListingElements();
+      const listings = findListingElements();
 
-    // Filtrar solo listings no procesados
-    const unprocessed = listings.filter(listing => {
-      const id = listing.dataset?.listingId ||
-                 listing.querySelector('a[href*="/listing/"]')?.href ||
-                 listing.textContent.substring(0, 50);
-      return !processedListings.has(id);
-    });
-
-    if (unprocessed.length === 0) return;
-
-    // Procesar en lotes
-    for (let i = 0; i < unprocessed.length && contextValid; i += BATCH_SIZE) {
-      const batch = unprocessed.slice(i, i + BATCH_SIZE);
-
-      const promises = batch.map((listing, idx) => (async () => {
-        // Stagger individual requests dentro del lote
-        await new Promise(r => setTimeout(r, idx * STAGGER_MS));
-        if (!contextValid) return;
-
+      // Filtrar solo listings no procesados
+      const unprocessed = listings.filter(listing => {
         const id = listing.dataset?.listingId ||
                    listing.querySelector('a[href*="/listing/"]')?.href ||
                    listing.textContent.substring(0, 50);
-        if (processedListings.has(id)) return;
-        processedListings.add(id);
+        return !processedListings.has(id);
+      });
 
-        const info = extractListingInfo(listing);
-        if (!info.marketName || !info.price || info.price <= 0) return;
+      if (unprocessed.length === 0) return;
 
-        const steamPrice = await getSteamPrice(info.marketName);
-        if (!contextValid) return;
+      // Procesar en lotes
+      for (let i = 0; i < unprocessed.length && contextValid; i += BATCH_SIZE) {
+        const batch = unprocessed.slice(i, i + BATCH_SIZE);
 
-        if (steamPrice && steamPrice > info.price) {
-          const badge = createProfitBadge(info.price, steamPrice);
-          if (badge) {
-            const container = listing.querySelector('[class*="price"], [class*="info"]') || listing;
-            container.style.position = 'relative';
-            container.appendChild(badge);
+        const promises = batch.map((listing, idx) => (async () => {
+          // Stagger individual requests dentro del lote
+          await new Promise(r => setTimeout(r, idx * STAGGER_MS));
+          if (!contextValid) return;
+
+          const id = listing.dataset?.listingId ||
+                     listing.querySelector('a[href*="/listing/"]')?.href ||
+                     listing.textContent.substring(0, 50);
+          if (processedListings.has(id)) return;
+          processedListings.add(id);
+
+          const info = extractListingInfo(listing);
+          if (!info.marketName || !info.price || info.price <= 0) return;
+
+          const steamPrice = await getSteamPrice(info.marketName);
+          if (!contextValid) return;
+
+          if (steamPrice && steamPrice > info.price) {
+            const badge = createProfitBadge(info.price, steamPrice);
+            if (badge) {
+              const container = listing.querySelector('[class*="price"], [class*="info"]') || listing;
+              container.style.position = 'relative';
+              container.appendChild(badge);
+            }
           }
+        })());
+
+        await Promise.all(promises);
+
+        // Delay entre lotes
+        if (i + BATCH_SIZE < unprocessed.length && contextValid) {
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
         }
-      })());
-
-      await Promise.all(promises);
-
-      // Delay entre lotes
-      if (i + BATCH_SIZE < unprocessed.length && contextValid) {
-        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
       }
+    } finally {
+      processingListings = false;
     }
   }
 
@@ -217,7 +227,9 @@
     await processListings();
 
     observer = new MutationObserver(() => {
-      setTimeout(processListings, 1000);
+      // Debounce más lento: csfloat.com re-renderiza el DOM constantemente
+      // y un debounce de 1s disparaba processListings en cada cambio.
+      setTimeout(processListings, 4000);
     });
 
     observer.observe(document.body, {
@@ -225,7 +237,8 @@
       subtree: true
     });
 
-    setInterval(processListings, 10000);
+    // Intervalo de barrido: 30s (antes 10s) — menos requests a Steam/background.
+    setInterval(processListings, 30000);
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

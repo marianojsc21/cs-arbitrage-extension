@@ -4,7 +4,7 @@
 >
 > ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
 
-**SaintProfit** (v3.8.2) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+**SaintProfit** (v3.10.2) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
 Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
@@ -59,7 +59,7 @@ Incluye **3 motores**: **SteamFarm** (profit CSFloat → Steam), **Smart Invest*
 | **Detener Escaneo** | Botón para detener la búsqueda sin perder resultados parciales |
 | **Links Directos** | Cada item con link a CSFloat y a Steam Market |
 | **Tabla Ordenable** | Clic en columnas para ordenar ascendente/descendente |
-| **3 Temas** | SaintProfit (default), Night (ultra-dark), Amber (cálido) |
+| **3 Temas** | Amber (default), Blanco (claro con rojo), Night (ultra-dark) |
 | **Badges en CSFloat** | Content script que muestra badges de profit en csfloat.com |
 | **Auto-Update** | Verificación de actualizaciones desde GitHub |
 | **Glow Dinámico** | Columna activa con glow naranja, inactiva con glow violeta |
@@ -519,7 +519,9 @@ Disponibles desde el footer (botón "Tema"):
 
 | Tema | Descripción |
 |---|---|
-| **SaintProfit** | Default: naranja + aqua + negro |
+| **Amber** | Default: naranja + aqua + negro |
+| **Blanco** | Claro con detalles rojos |
+| **Night** | Ultra-dark con cuchillo Blue Gem |
 | **Night** | Ultra-dark, aún más profundo |
 | **Amber** | Cálido, tonos ámbar |
 
@@ -598,6 +600,13 @@ Si hay una versión más nueva, descarga los archivos actualizados y los almacen
 
 | Versión | Cambios |
 |---|---|
+| **v3.10.2** | 🎨 **Temas**: dot del tema Amber refinado a naranja puro e intenso (#ff7a1a) |
+| **v3.10.1** | 🎨 **Temas**: Amber naranja (default), tema SaintProfit eliminado, Blanco segundo en la lista |
+| **v3.10.0** | 🎨 **Temas**: Amber pasa a ser el tema principal por defecto; el logo en Night ahora tiene el cuchillo estilo Blue Gem (azul); nuevo tema **Blanco** con detalles rojos |
+| **v3.9.0** | 🛡️ **Anti rate-limit en Market Sniper**: listings de CSFloat se traen en páginas de 50 (4x menos requests), caché de listings de 10 min, polling de alertas cada 3 min, auto-scan de Steam cada 2 min, y cola con gap en el fetch de Steam del background + guard anti-concurrencia en el content script |
+| **v3.8.5** | ⚖️ **Balance visual en columnas inactivas**: el Top 7 histórico ahora se distribuye a lo largo de todo el alto disponible (space-between) con items más aireados, para compensar las stats compactas y llenar el espacio vacío |
+| **v3.8.4** | 🎯 **Top 7 histórico sin scroll**: se achican las stats de los modos inactivos (min-height 110→60px) y se compactan los items del Top 7 para que entre completo en la columna, eliminando el scroll interno |
+| **v3.8.3** | 🎯 **Fix de layout**: las columnas de modos no seleccionados ya no se desbordan por debajo de los límites marcados (overflow contenido + scroll interno en el Top 7) |
 | **v3.8.2** | 💾 **Caché de CSFloat persistente**: el price-list (~27k items) se guarda en `chrome.storage.local` (con `unlimitedStorage` para la cuota) y se carga al abrir la extensión — los precios sobreviven a recargas sin re-descargar |
 | **v3.8.1** | 🧹 **Limpieza de fallbacks muertos de CSFloat**: eliminados los fetches directos a `price-list`/`listings` de app.js, smart-invest.js y market-sniper.js (y sus constantes `CSFLOAT_API`/`CSFLOAT_LISTINGS_API`/`CSFLOAT_PRICE_API`) — los 3 modos usan exclusivamente `CSFloatClient` (key + caché + cola + puente de sesión) |
 | **v3.8.0** | 💾 **Caché de Steam persistente**: los precios de `SteamClient` se guardan en `chrome.storage.local` (máx. 3000 items, debounce 2s) y se cargan al abrir la extensión — los precios sobreviven a recargas sin re-consultar a Steam |

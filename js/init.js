@@ -292,10 +292,11 @@ window.renderHistoricalTop5 = renderHistoricalTop5;
 
 // ===== THEME SYSTEM =====
 const THEME_STORAGE_KEY = 'saintprofit_theme';
-const THEMES = ['saintprofit', 'night', 'amber'];
+const THEMES = ['amber', 'white', 'night'];
+const THEME_NAMES = { amber: 'Amber', white: 'Blanco', night: 'Night' };
 
 function setTheme(theme) {
-  if (!THEMES.includes(theme)) theme = 'saintprofit';
+  if (!THEMES.includes(theme)) theme = 'amber'; // Amber es el tema principal
   document.documentElement.setAttribute('data-theme', theme);
   StorageHelper.setItem(THEME_STORAGE_KEY, theme);
 
@@ -312,20 +313,19 @@ function setTheme(theme) {
     dot.className = 'theme-dot ' + theme;
   }
   if (label) {
-    const names = { saintprofit: 'Tema', night: 'Night', amber: 'Amber' };
-    label.textContent = names[theme] || 'Tema';
+    label.textContent = THEME_NAMES[theme] || 'Tema';
   }
 }
 
-// Load saved theme or default
+// Load saved theme or default (Amber es el principal)
 document.addEventListener('DOMContentLoaded', () => {
   const saved = StorageHelper.getItem(THEME_STORAGE_KEY);
-  setTheme(saved || 'saintprofit');
+  setTheme(saved || 'amber');
 });
 // Also run now if DOM already ready
 if (document.readyState !== 'loading') {
   const saved = StorageHelper.getItem(THEME_STORAGE_KEY);
-  setTheme(saved || 'saintprofit');
+  setTheme(saved || 'amber');
 }
 
 // Theme toggle: click toggle button → show/hide popup, click item → set theme, click outside → close
@@ -344,7 +344,7 @@ if (themeToggle && themePopup) {
       const theme = item.dataset.themeVal;
       setTheme(theme);
       themePopup.classList.remove('show');
-      showToastTheme(`🎨 Tema cambiado a ${theme === 'saintprofit' ? 'SaintProfit' : theme === 'night' ? 'Night' : 'Amber'}`, 'info');
+      showToastTheme(`🎨 Tema cambiado a ${THEME_NAMES[theme] || theme}`, 'info');
     }
   });
 

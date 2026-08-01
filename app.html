@@ -71,7 +71,9 @@
     }
 
     [data-theme="night"] .brand-col .brand-image {
-      filter: drop-shadow(0 0 20px rgba(139,92,246,0.3)) hue-rotate(240deg) saturate(0.8);
+      /* Cuchillo estilo Blue Gem (Case Hardened azul): tono azul profundo +
+         saturación alta + brillo metálico cian */
+      filter: drop-shadow(0 0 24px rgba(56,189,248,0.45)) hue-rotate(200deg) saturate(1.7) brightness(1.15) contrast(1.05);
     }
 
     [data-theme="night"] .mode-col.inactive {
@@ -171,6 +173,185 @@
       background: rgba(255,215,0,0.2);
       color: #ffe44d;
       box-shadow: 0 0 14px rgba(255,215,0,0.35);
+    }
+
+    /* ===== WHITE THEME (blanco con detalles rojos) ===== */
+    [data-theme="white"] {
+      --bg-primary: #f2f2f5;
+      --bg-secondary: #ffffff;
+      --bg-card: rgba(0,0,0,0.04);
+      --bg-card-hover: rgba(0,0,0,0.08);
+      --border: rgba(0,0,0,0.14);
+      --border-hover: rgba(0,0,0,0.28);
+      --text-primary: #16161a;
+      --text-secondary: #4a4a52;
+      --text-muted: #8a8a94;
+      --accent-1: #d92d20;
+      --accent-2: #f04438;
+      --accent-3: #b42318;
+      --profit-green: #039855;
+      --profit-yellow: #b54708;
+      --profit-orange: #dc6803;
+      --profit-red: #d92d20;
+      --glow-orange: rgba(217,45,32,0.22);
+      --glow-aqua: rgba(217,45,32,0.14);
+      --bg-glow-1: rgba(217,45,32,0.06);
+      --bg-glow-2: rgba(217,45,32,0.04);
+      --bg-glow-3: rgba(217,45,32,0.03);
+    }
+
+    [data-theme="white"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); }
+    [data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.35); }
+
+    [data-theme="white"] .filter-card {
+      background: rgba(255,255,255,0.7);
+      border: 1.5px solid rgba(0,0,0,0.16);
+    }
+
+    [data-theme="white"] .mode-header .btn-primary::before {
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+    }
+
+    [data-theme="white"] .mode-stats .stat-card {
+      background: rgba(255,255,255,0.65);
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .mode-progress .progress-bar {
+      background: rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .mode-results .empty-state {
+      background: rgba(255,255,255,0.6);
+      border: 1px dashed rgba(0,0,0,0.18);
+    }
+
+    [data-theme="white"] .mode-results th {
+      background: rgba(217,45,32,0.06);
+    }
+
+    [data-theme="white"] .mode-results th.sorted {
+      color: var(--accent-1);
+    }
+
+    [data-theme="white"] .mode-results td {
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    [data-theme="white"] .mode-col .history-item {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .mode-col.inactive .historical-top5 {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(0,0,0,0.12);
+    }
+
+    [data-theme="white"] .mode-col.inactive .historical-top5 .ht5-header {
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .mode-col.inactive .historical-top5 .ht5-item {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    [data-theme="white"] .mode-col.inactive .historical-top5 .ht5-item:hover {
+      background: rgba(217,45,32,0.08);
+      border-color: rgba(217,45,32,0.25);
+    }
+
+    [data-theme="white"] .mode-col.active {
+      border-color: var(--accent-1);
+      box-shadow: inset 0 0 25px rgba(217,45,32,0.04);
+    }
+
+    [data-theme="white"] .filter-card-active {
+      border-color: var(--accent-1) !important;
+      box-shadow: 0 0 16px var(--glow-orange), inset 0 0 30px rgba(217,45,32,0.05);
+    }
+
+    [data-theme="white"] .brand-col .brand-image {
+      filter: drop-shadow(0 0 20px rgba(217,45,32,0.25));
+    }
+
+    [data-theme="white"] .mode-stats .stat-value {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    [data-theme="white"] .mode-col.inactive .mode-stats .stat-value {
+      -webkit-text-fill-color: currentColor;
+      background: none;
+      color: var(--accent-1);
+    }
+
+    [data-theme="white"] .mode-col.inactive .mode-stats .stat-icon {
+      color: var(--accent-1);
+    }
+
+    [data-theme="white"] .diff-badge.ideal {
+      background: rgba(217,45,32,0.1);
+      color: var(--accent-3);
+      box-shadow: 0 0 10px rgba(217,45,32,0.2);
+    }
+
+    [data-theme="white"] .mode-results th:hover {
+      background: rgba(217,45,32,0.1);
+    }
+
+    [data-theme="white"] .mode-results tr:hover {
+      background: rgba(217,45,32,0.04);
+    }
+
+    [data-theme="white"] .mode-col .historical-top5 .ht5-header {
+      color: var(--accent-1);
+    }
+
+    [data-theme="white"] .inv-combo-card {
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .inv-combo-metric {
+      background: rgba(0,0,0,0.03);
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    [data-theme="white"] .inv-combo-item {
+      background: rgba(0,0,0,0.02);
+    }
+
+    [data-theme="white"] .inv-combo-item:hover {
+      background: rgba(217,45,32,0.05);
+    }
+
+    [data-theme="white"] .inv-liquidity .star-empty {
+      color: rgba(0,0,0,0.2);
+    }
+
+    [data-theme="white"] .cache-indicator {
+      background: rgba(255,255,255,0.6);
+      border-color: rgba(0,0,0,0.1);
+    }
+
+    [data-theme="white"] .theme-popup {
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+
+    [data-theme="white"] .history-item:hover {
+      background: rgba(217,45,32,0.05);
+      border-color: rgba(217,45,32,0.18);
+    }
+
+    /* Inline white backgrounds in tutorial cards (Smart Invest / Sniper empty states) */
+    [data-theme="white"] #invTutorial div[style*="rgba(255,255,255"],
+    [data-theme="white"] #snipResultsContainer div[style*="rgba(255,255,255"] {
+      background: rgba(255,255,255,0.65) !important;
+      border-color: rgba(0,0,0,0.1) !important;
     }
 
     body {
@@ -1297,9 +1478,9 @@
       transition: background 0.3s ease;
     }
 
-    .theme-toggle .theme-dot.saintprofit { background: var(--accent-1); }
     .theme-toggle .theme-dot.night { background: #333; box-shadow: 0 0 4px rgba(255,85,32,0.5); }
-    .theme-toggle .theme-dot.amber { background: #ffd700; box-shadow: 0 0 4px rgba(255,215,0,0.5); }
+    .theme-toggle .theme-dot.amber { background: #ff7a1a; box-shadow: 0 0 4px rgba(255,122,26,0.6); }
+    .theme-toggle .theme-dot.white { background: #ffffff; box-shadow: 0 0 4px rgba(224,32,32,0.6); }
 
     .theme-popup {
       display: none;
@@ -1354,9 +1535,9 @@
       border: 1px solid var(--border);
     }
 
-    .theme-popup-item .tp-dot.saintprofit { background: #ff6b35; }
     .theme-popup-item .tp-dot.night { background: #1a1a1a; }
-    .theme-popup-item .tp-dot.amber { background: #ffd700; }
+    .theme-popup-item .tp-dot.amber { background: #ff7a1a; }
+    .theme-popup-item .tp-dot.white { background: #ffffff; border-color: rgba(224,32,32,0.6); }
 
     .theme-popup-item .tp-check {
       margin-left: auto;
@@ -1392,6 +1573,8 @@
       padding: 12px;
       opacity: 0.55;
       border-color: var(--border);
+      overflow: hidden;
+      min-height: 0;
     }
 
     .mode-col.inactive .mode-header {
@@ -1412,18 +1595,18 @@
 
     .mode-col.inactive .mode-stats {
       grid-template-columns: 1fr;
-      gap: 5px;
+      gap: 4px;
     }
 
     .mode-col.inactive .mode-stats .stat-card {
-      padding: 12px 8px;
+      padding: 5px 8px;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
-      min-height: 110px;
+      gap: 2px;
+      min-height: 60px;
     }
 
     /* ===== INTENSE GLOW ON SCAN BUTTON FOR ACTIVE MODE ===== */
@@ -1436,23 +1619,23 @@
     }
 
     .mode-col.inactive .mode-stats .stat-icon {
-      font-size: 1.5rem;
+      font-size: 1rem;
       margin-bottom: 0;
       display: block;
     }
 
     .mode-col.inactive .mode-stats .stat-value {
-      font-size: 1.15rem;
+      font-size: 0.9rem;
       -webkit-text-fill-color: currentColor;
       background: none;
       color: var(--accent-1);
       display: block;
-      line-height: 1.2;
+      line-height: 1.15;
       font-weight: 700;
     }
 
     .mode-col.inactive .mode-stats .stat-label {
-      font-size: 0.6rem;
+      font-size: 0.55rem;
       display: block;
       margin-top: 0;
       font-weight: 600;
@@ -1467,21 +1650,22 @@
       display: flex;
       flex-direction: column;
       flex: 1;
-      margin-top: 8px;
+      min-height: 0;
+      margin-top: 10px;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 8px;
-      padding: 10px 10px;
+      padding: 12px 10px;
     }
 
     .mode-col.inactive .historical-top5 .ht5-header {
-      font-size: 0.62rem;
+      font-size: 0.6rem;
       font-weight: 800;
       color: var(--accent-3);
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      margin-bottom: 8px;
-      padding-bottom: 6px;
+      margin-bottom: 5px;
+      padding-bottom: 4px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
       text-align: center;
     }
@@ -1489,8 +1673,9 @@
     .mode-col.inactive .historical-top5 .ht5-list {
       display: flex;
       flex-direction: column;
-      justify-content: space-around;
+      justify-content: space-evenly;
       flex: 1;
+      min-height: 0;
       gap: 4px;
     }
 
@@ -1498,9 +1683,10 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding: 6px 8px 5px;
+      padding: 5px 10px 4px;
       border-radius: 6px;
       font-size: 0.6rem;
+      line-height: 1.3;
       background: rgba(255,255,255,0.02);
       border: 1px solid rgba(255,255,255,0.03);
       transition: all var(--transition);
@@ -1520,6 +1706,7 @@
       align-items: center;
       gap: 6px;
       width: 100%;
+      line-height: 1.25;
     }
 
     .mode-col.inactive .historical-top5 .ht5-item-bottom {
@@ -1529,6 +1716,7 @@
       gap: 6px;
       width: 100%;
       padding-left: 24px;
+      line-height: 1.25;
     }
 
     .mode-col.inactive .historical-top5 .ht5-rank {
@@ -2929,24 +3117,24 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer" style="position:relative">
-      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.8.2</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
+      <img src="icons/icon16.png" class="footer-logo" alt=""> <span class="version">SaintProfit v3.10.2</span> · Datos de <a href="https://csfloat.com" target="_blank">CSFloat</a> y <a href="https://steamcommunity.com/market" target="_blank">Steam Market</a>
       <span class="update-badge" id="updateBadge" style="display:none" title="Nueva versión disponible. Clic para actualizar.">🆕 Nueva versión: v<span id="updateBadgeVersion"></span></span>
       <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
-        <span class="theme-dot saintprofit" id="themeDot"></span>
-        <span id="themeLabel">Tema</span>
+        <span class="theme-dot amber" id="themeDot"></span>
+        <span id="themeLabel">Amber</span>
       </button>
       <div class="theme-popup" id="themePopup">
-        <button class="theme-popup-item active" data-theme-val="saintprofit">
-          <span class="tp-dot saintprofit"></span>
-          SaintProfit <span class="tp-check">✓</span>
+        <button class="theme-popup-item active" data-theme-val="amber">
+          <span class="tp-dot amber"></span>
+          Amber <span class="tp-check">✓</span>
+        </button>
+        <button class="theme-popup-item" data-theme-val="white">
+          <span class="tp-dot white"></span>
+          Blanco <span class="tp-check">✓</span>
         </button>
         <button class="theme-popup-item" data-theme-val="night">
           <span class="tp-dot night"></span>
           Night <span class="tp-check">✓</span>
-        </button>
-        <button class="theme-popup-item" data-theme-val="amber">
-          <span class="tp-dot amber"></span>
-          Amber <span class="tp-check">✓</span>
         </button>
       </div>
     </footer>
