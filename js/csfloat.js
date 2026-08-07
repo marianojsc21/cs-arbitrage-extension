@@ -135,6 +135,24 @@
     return p;
   }
 
+  /** Detecta el 403 de CSFloat que exige sesión logueada (listings).
+   *  Desde 2025 CSFloat devuelve 403 "You need to be logged in to search
+   *  listings" en /api/v1/listings cuando no hay cookie de sesión, aunque
+   *  se mande la API key. El price-list NO exige sesión (sigue con key). */
+  function isLoginRequired(status, body) {
+    if (status !== 403) return false;
+    const s = String(body || '').toLowerCase();
+    return s.includes('logged in') || s.includes('log in') || s.includes('login');
+  }
+
+  /** Error tipado: el usuario debe iniciar sesión en csfloat.com para listings */
+  function makeLoginError() {
+    const err = new Error('CSFloat ahora exige iniciar sesión en csfloat.com para buscar listings (403).');
+    err.code = 'LOGIN_REQUIRED';
+    err.status = 403;
+    return err;
+  }
+
   /** Fetch a la API de CSFloat con la key + backoff en 429 */
   async function csfloatFetch(url) {
     const headers = {
@@ -161,7 +179,9 @@
       if (!resp.ok) {
         let body = '';
         try { body = await resp.text(); } catch (e) {}
-        throw new Error(`CSFloat error: ${resp.status} - ${body.slice(0, 200)}`);
+        const err = new Error(`CSFloat error: ${resp.status} - ${body.slice(0, 200)}`);
+        err.status = resp.status;
+        throw err;
       }
       return resp;
     }
@@ -295,10 +315,16 @@
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = await chrome.tabs.sendMessage(tabId, { action: 'csfloatFetch', url });
-          if (res && res.ok && res.body) {
-            return JSON.parse(res.body);
+          if (!res) return null;
+          if (res.ok && res.body) {
+            try { return { kind: 'ok', data: JSON.parse(res.body) }; }
+            catch (e) { return { kind: 'http', status: res.status || 0, message: 'Respuesta inválida de CSFloat' }; }
           }
-          if (res && res.error) return null;
+          // El puente respondió: distinguir 403-login del resto para que el
+          // caller pueda dar un mensaje accionable en vez de un 0/0 silencioso.
+          if (isLoginRequired(res.status, res.body)) return { kind: 'login', status: 403, message: (res.body || '').slice(0, 200) };
+          if (res.status) return { kind: 'http', status: res.status, message: (res.body || String(res.error || '')).slice(0, 200) };
+          return null;
         } catch (e) { /* content script todavía no listo */ }
         await sleep(700);
       }
@@ -309,7 +335,11 @@
   /** Trae listings buy_now paginados (usado por Market Sniper).
    *  Prioridad: 1) puente por sesión de csfloat.com (evita el 403 de login),
    *  2) fetch directo con key + cola + backoff. */
-  async function fetchListings(maxListings) {
+  async function fetchListings(maxListings, opts = {}) {
+    // openSessionOnLogin: al detectar 403-login, abrir/focalizar csfloat.com
+    // en primer plano (default true). Los sondeos de waitForSessionReady lo
+    // desactivan para no robar el foco cada pocos segundos.
+    const openOnLogin = opts.openSessionOnLogin !== false;
     const limit = Math.max(1, Math.min(parseInt(maxListings, 10) || 100, 500));
     const listings = [];
     let cursor = null;
@@ -323,14 +353,47 @@
       let url = `${LISTINGS_URL}?limit=${BATCH_SIZE}&types=buy_now`;
       if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
 
-      const data = await rateLimited(async () => {
-        // 1) Sesión del navegador (content script en csfloat.com)
-        const viaSession = await fetchViaSession(url);
-        if (viaSession) return viaSession;
-        // 2) Directo con key
-        const resp = await csfloatFetch(url);
-        return resp.json();
-      });
+      let data;
+      try {
+        data = await rateLimited(async () => {
+          // 1) Sesión del navegador (content script en csfloat.com)
+          const viaSession = await fetchViaSession(url);
+          if (viaSession) {
+            if (viaSession.kind === 'ok') return viaSession.data;
+            if (viaSession.kind === 'login') throw makeLoginError();
+            // Otros errores HTTP del puente: reintentar por la vía directa
+          }
+          // 2) Directo con key
+          try {
+            const resp = await csfloatFetch(url);
+            return resp.json();
+          } catch (e) {
+            // 403 de login desde el fetch directo → mismo error tipado
+            if (isLoginRequired(e.status, e.message)) throw makeLoginError();
+            // Fuera de la extensión (sin chrome.tabs), un fetch sin status es
+            // un bloqueo CORS: los listings NO son accesibles anónimamente,
+            // así que el flujo accionable (sesión/extensión) aplica igual.
+            // Dentro de la extensión un fallo sin status es de red real → se
+            // re-lanza. Ojo: window.chrome existe en toda pestaña de Chrome;
+            // la señal de "contexto de extensión" es chrome.tabs/runtime.
+            if (!(typeof chrome !== 'undefined' && chrome.tabs) && !e.status && !(e && e.name === 'AbortError')) {
+              const netErr = new Error('No se pudo consultar los listings de CSFloat (CORS/red). La búsqueda de listings exige la extensión con sesión iniciada en csfloat.com.');
+              netErr.code = 'LOGIN_REQUIRED';
+              netErr.status = 0;
+              throw netErr;
+            }
+            throw e;
+          }
+        });
+      } catch (e) {
+        // 403 de login: abrir/focalizar csfloat.com en primer plano para que
+        // el usuario pueda iniciar sesión (solo tiene efecto en la extensión;
+        // en una pestaña normal sin chrome.* no hace nada y el UI avisa).
+        if (e && e.code === 'LOGIN_REQUIRED' && openOnLogin) {
+          try { openSessionForLogin(); } catch (err) {}
+        }
+        throw e;
+      }
 
       const batch = data.data || data || [];
       if (!batch.length) break;
@@ -358,5 +421,72 @@
     };
   }
 
-  window.CSFloatClient = { getPriceList, fetchListings, fetchViaSession, getCacheInfo, ensureSessionTab };
+  /** Abre (o enfoca) una pestaña de csfloat.com EN PRIMER PLANO para que el
+   *  usuario inicie sesión y desbloquee los listings. Invalida la pestaña
+   *  que respondió 403 (sesión caída) para que el próximo escaneo revalide.
+   *  Devuelve el tabId, o null fuera del contexto de extensión. */
+  async function openSessionForLogin() {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.tabs) return null;
+      sessionTabId = null;      // invalidar pestaña que dio 403 (sin sesión)
+      sessionTabPromise = null; // cancelar cualquier ensureSessionTab en curso
+      emitAutoOpenNotice('opening');
+      const tabs = await chrome.tabs.query({ url: 'https://csfloat.com/*' });
+      for (const t of tabs || []) {
+        try {
+          await chrome.tabs.update(t.id, { active: true });
+          sessionTabId = t.id;
+          // 'ready' SOLO si el content script responde al ping (igual que
+          // doEnsureSessionTab); si no, la UI sigue mostrando "abriendo".
+          try {
+            const res = await chrome.tabs.sendMessage(t.id, { action: 'ping' });
+            if (res && res.ok) emitAutoOpenNotice('ready');
+          } catch (e) { /* content script aún cargando */ }
+          return t.id;
+        } catch (e) { /* probar la siguiente */ }
+      }
+      const tab = await chrome.tabs.create({ url: 'https://csfloat.com/search', active: true });
+      if (!tab || !tab.id) return null;
+      sessionTabId = tab.id;
+      // Esperar el ping antes de decir "listo" (hasta 20s)
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        try {
+          const res = await chrome.tabs.sendMessage(sessionTabId, { action: 'ping' });
+          if (res && res.ok) { emitAutoOpenNotice('ready'); return sessionTabId; }
+        } catch (e) { /* todavía cargando */ }
+        await sleep(500);
+      }
+      return sessionTabId;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Espera (sondeando) a que la sesión de csfloat.com permita traer listings,
+   * es decir, a que el usuario haya iniciado sesión en la pestaña abierta.
+   * Sondea fetchListings(1) cada pollMs hasta timeoutMs, SIN abrir pestañas
+   * ni robar foco (openSessionOnLogin: false). Devuelve true si la sesión
+   * quedó lista, false si se agotó el tiempo o no hay contexto de extensión.
+   * onPoll(attempt) se llama antes de cada intento para feedback de UI.
+   */
+  async function waitForSessionReady({ timeoutMs = 120000, pollMs = 5000, onPoll = null } = {}) {
+    if (typeof chrome === 'undefined' || !chrome.tabs) return false;
+    const deadline = Date.now() + timeoutMs;
+    let attempt = 0;
+    while (Date.now() < deadline) {
+      attempt++;
+      if (onPoll) { try { onPoll(attempt); } catch (e) {} }
+      try {
+        await fetchListings(1, { openSessionOnLogin: false });
+        return true; // la sesión respondió listings → el usuario está logueado
+      } catch (e) {
+        // LOGIN_REQUIRED, red, etc.: la sesión aún no está lista
+        if (Date.now() >= deadline) break;
+        await sleep(pollMs);
+      }
+    }
+    return false;
+  }
+
+  window.CSFloatClient = { getPriceList, fetchListings, fetchViaSession, getCacheInfo, ensureSessionTab, openSessionForLogin, waitForSessionReady };
 })();

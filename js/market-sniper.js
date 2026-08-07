@@ -1156,6 +1156,14 @@
   /// Track which source is currently scanning (independiente por botón)
   let currentScanSource = null;
 
+  /// Token anti-duplicado para el reintento automático post-login: cada
+  /// escaneo manual incrementa scanToken; el reintento solo dispara si el
+  /// token no cambió (es decir, el usuario no arrancó otro escaneo).
+  let scanToken = 0;
+  /// Cuánto esperamos la sesión de csfloat.com antes de rendirnos.
+  const AUTO_RETRY_TIMEOUT_MS = 120000; // 2 min
+  let autoRetryPending = false;
+
   /** Helper: get the correct button element for a given source */
   function _scanBtn(source) {
     return source === 'csfloat' ? $('snipScanCsBtn') : $('snipScanSteamBtn');
@@ -1164,6 +1172,7 @@
   /** Shared scan setup: returns options + resets UI. Solo modifica el botón del source indicado. */
   function _scanSetup(source) {
     if (!engine) return null;
+    scanToken++;
     // Si ya hay un escaneo corriendo, detenerlo primero y empezar el nuevo
     if (engine.scanning) {
       engine.stopScan();
@@ -1260,9 +1269,65 @@
 
   /** Handle scan error */
   function _scanError(ctx, e) {
-    if (ctx.statusEl) ctx.statusEl.textContent = `❌ Error: ${e.message}`;
-    if (ctx.container) ctx.container.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">❌</span><h3>Error</h3><p>${e.message}</p></div>`;
-    showToast(`❌ Error: ${e.message}`, 'error');
+    // Error de sesión: la API de listings de CSFloat exige estar logueado.
+    // Abrimos/focalizamos csfloat.com en primer plano y damos un mensaje
+    // accionable (sin sesión los listings no se pueden obtener, pero el
+    // price-list sí — SteamFarm y Smart Invest siguen funcionando).
+    if (e && e.code === 'LOGIN_REQUIRED') {
+      // La pestaña de csfloat.com ya se abrió/focalizó en fetchListings
+      // (CSFloatClient). En la extensión, además, reintentamos el escaneo
+      // automáticamente cuando se detecte la sesión iniciada.
+      const hasExtension = typeof chrome !== 'undefined' && chrome.tabs;
+      const friendly = hasExtension
+        ? '🔐 CSFloat exige iniciar sesión para ver listings. Abriendo csfloat.com — iniciá sesión y reescaneamos solos.'
+        : '🔐 La búsqueda de listings de CSFloat exige una sesión iniciada en csfloat.com, y este escaneo corre fuera de la extensión. Usá la extensión SaintProfit con tu sesión de csfloat.com activa.';
+      if (ctx.statusEl) ctx.statusEl.textContent = `❌ ${friendly}`;
+      if (ctx.container) {
+        ctx.container.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">🔐</span><h3>Necesitás iniciar sesión en CSFloat</h3><p style="max-width:320px">CSFloat ahora exige una sesión activa en csfloat.com para buscar listings (403). ${hasExtension
+          ? 'Se abrió la pestaña: <a href="https://csfloat.com/" target="_blank" style="color:var(--accent-1);font-weight:600">iniciá sesión</a> — en cuanto se detecte la sesión, reescaneamos automáticamente.'
+          : 'Estás viendo la app fuera de la extensión — abrí <a href="https://csfloat.com/" target="_blank" style="color:var(--accent-1);font-weight:600">csfloat.com</a>, iniciá sesión y usá el escaneo desde la extensión.'}</p><p style="font-size:0.62rem;color:var(--text-muted)">SteamFarm y Smart Invest siguen funcionando sin sesión (usan el price-list).</p></div>`;
+      }
+      showToast(friendly, 'warning');
+
+      // ---- Reintento automático cuando la sesión esté lista (solo extensión) ----
+      if (hasExtension && !autoRetryPending) {
+        autoRetryPending = true;
+        const tokenAtError = scanToken;
+        if (window.CSFloatClient && typeof window.CSFloatClient.waitForSessionReady === 'function') {
+          window.CSFloatClient.waitForSessionReady({
+            timeoutMs: AUTO_RETRY_TIMEOUT_MS,
+            pollMs: 5000,
+            onPoll: (attempt) => {
+              if (ctx.statusEl && attempt > 0) {
+                ctx.statusEl.textContent = `⏳ Esperando que inicies sesión en csfloat.com... (intento ${attempt}) — se reescanea solo.`;
+              }
+            },
+          }).then((ready) => {
+            autoRetryPending = false;
+            if (!ready) {
+              // Se agotó el tiempo sin detectar sesión: volver al aviso base
+              if (ctx.statusEl) ctx.statusEl.textContent = `❌ ${friendly}`;
+              showToast('⏰ No se detectó la sesión en csfloat.com — volvé a escanear cuando hayas iniciado sesión.', 'warning');
+              return;
+            }
+            if (engine.scanning || scanToken !== tokenAtError) return; // el usuario ya escaneó
+            if (ctx.statusEl) ctx.statusEl.textContent = '✅ Sesión detectada — reescaneando...';
+            showToast('✅ Sesión de csfloat.com detectada — reescaneando automáticamente', 'success');
+            // Re-ejecutar el MISMO escaneo que falló (el de Steam también
+            // puede pedir listings en su fase de charm arbitrage).
+            if (ctx.source === 'steam') startScanSteam();
+            else startScanCs();
+          }).catch(() => { autoRetryPending = false; });
+        } else {
+          autoRetryPending = false;
+        }
+      }
+      return;
+    }
+    const msg = (e && e.message) || String(e);
+    if (ctx.statusEl) ctx.statusEl.textContent = `❌ Error: ${msg}`;
+    if (ctx.container) ctx.container.innerHTML = `<div class="empty-state"><span class="empty-icon" style="font-size:2.2rem">❌</span><h3>Error</h3><p>${msg}</p></div>`;
+    showToast(`❌ Error: ${msg}`, 'error');
   }
 
   // ======================================================================

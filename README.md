@@ -4,7 +4,7 @@
 >
 > ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
 
-**SaintProfit** (v3.10.2) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
+**SaintProfit** (v3.10.3) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
 Analiza **skins, cuchillos, guantes, pegatinas, cajas, agentes, llaveros, parches, lotes de música, coleccionables y graffiti**, calculando el profit real descontando las comisiones de cada mercado (15% Steam, 2% CSFloat).
 
@@ -600,6 +600,7 @@ Si hay una versión más nueva, descarga los archivos actualizados y los almacen
 
 | Versión | Cambios |
 |---|---|
+| **v3.10.3** | 🔐 **CSFloat 403 de sesión**: la API de listings exige estar logueado en csfloat.com — mensaje claro y accionable en vez del error crudo, apertura automática de la pestaña para iniciar sesión y **reescaneo automático** al detectar la sesión (sin volver a apretar Escanear) |
 | **v3.10.2** | 🎨 **Temas**: dot del tema Amber refinado a naranja puro e intenso (#ff7a1a) |
 | **v3.10.1** | 🎨 **Temas**: Amber naranja (default), tema SaintProfit eliminado, Blanco segundo en la lista |
 | **v3.10.0** | 🎨 **Temas**: Amber pasa a ser el tema principal por defecto; el logo en Night ahora tiene el cuchillo estilo Blue Gem (azul); nuevo tema **Blanco** con detalles rojos |

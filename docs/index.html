@@ -237,11 +237,24 @@
   <!-- ===================== CHANGELOG ===================== -->
   <section class="section section-dark" id="changelog">
     <div class="container">
-      <h2 class="section-title">📜 Novedades — v3.10.2</h2>
+      <h2 class="section-title">📜 Novedades — v3.10.3</h2>
       <p class="section-sub">Lo último de SaintProfit, actualizado con cada versión.</p>
 
       <div class="changelog-list">
         <div class="changelog-item current">
+          <span class="changelog-ver">v3.10.3</span>
+          <div class="changelog-body">
+            <h3>🔐 Listings de CSFloat exigen sesión iniciada</h3>
+            <ul>
+              <li>La API de listings de CSFloat ahora devuelve <strong>403</strong> sin una sesión activa en csfloat.com: detectamos ese caso y mostramos un mensaje claro y accionable en vez del error crudo.</li>
+              <li>Se abre automáticamente csfloat.com para que <strong>inicies sesión</strong>.</li>
+              <li><strong>Reescaneo automático:</strong> en cuanto se detecta la sesión, Market Sniper vuelve a escanear solo, sin volver a apretar "Escanear".</li>
+              <li>SteamFarm y Smart Invest siguen funcionando sin sesión (usan el price-list).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="changelog-item">
           <span class="changelog-ver">v3.10.2</span>
           <div class="changelog-body">
             <h3>🎨 Dot del tema Amber refinado</h3>
@@ -351,7 +364,7 @@
     <div class="footer-inner">
       <div class="footer-brand">
         <img src="assets/logo.png" alt="" class="footer-logo">
-        <span>SaintProfit <span class="footer-ver">v3.10.2</span></span>
+        <span>SaintProfit <span class="footer-ver">v3.10.3</span></span>
       </div>
       <div class="footer-links">
         <a href="#modos">Modos</a>
