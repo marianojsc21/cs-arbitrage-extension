@@ -2,7 +2,9 @@
 
 > 🌐 **Sitio web de documentación:** [saintprofit — GitHub Pages](https://marianojsc21.github.io/cs-arbitrage-extension/) — guía visual de los 3 modos, instalación paso a paso y preguntas frecuentes, pensada para usuarios no técnicos.
 >
-> ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas de los modos son mockups CSS que podés reemplazar por screenshots reales (guarda las imágenes en `docs/assets/`).
+> ⚙️ **Para activar el sitio:** Repo Settings → Pages → **Deploy from a branch** → `main` → carpeta **`/docs`** → Save. El sitio vive en `docs/index.html`; las capturas reales de los 3 modos están en `docs/assets/screenshots/` (PNG 1700×940, tema Amber). Para regenerarlas: abrí `app.html` en el navegador, activá el modo y sacá la captura (Market Sniper: escaneá primero para mostrar su estado real).
+>
+> 🔐 **Market Sniper y la sesión de csfloat.com (desde v3.10.3):** la API de listings de CSFloat exige estar logueado en csfloat.com. Sin sesión, la app muestra el aviso 🔐 y abre la pestaña para iniciar sesión; en cuanto la detecta, **reescanea sola**. La captura del modo en el sitio refleja ese estado.
 
 **SaintProfit** (v3.10.3) es una extensión de navegador (Brave/Chrome) que detecta **oportunidades de arbitraje** entre **CSFloat** y **Steam Market** para artículos de Counter-Strike 2 (CS2).
 
